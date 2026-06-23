@@ -19,6 +19,7 @@ type CachedFlags = {
   hasContests?: boolean;
   hasPolls?: boolean;
   giftEnabled?: boolean;
+  additionalOptionsVisible?: boolean;
 };
 
 function readFlagsCache(): CachedFlags {
@@ -73,16 +74,35 @@ export function useFeatureFlags() {
     retry: false,
   });
 
+  const { data: additionalOptionsConfig } = useQuery({
+    queryKey: ['additional-options-visible'],
+    queryFn: brandingApi.getAdditionalOptionsVisible,
+    staleTime: 60000,
+    retry: false,
+  });
+
   const flags = {
     referralEnabled: referralTerms ? referralTerms.is_enabled : cached.referralEnabled,
     wheelEnabled: wheelConfig ? wheelConfig.is_enabled : cached.wheelEnabled,
     hasContests: contestsCount ? contestsCount.count > 0 : cached.hasContests,
     hasPolls: pollsCount ? pollsCount.count > 0 : cached.hasPolls,
     giftEnabled: giftConfig ? giftConfig.enabled : cached.giftEnabled,
+    additionalOptionsVisible:
+      additionalOptionsConfig !== undefined
+        ? additionalOptionsConfig.enabled
+        : cached.additionalOptionsVisible,
   };
 
   useEffect(() => {
-    if (!referralTerms && !wheelConfig && !contestsCount && !pollsCount && !giftConfig) return;
+    if (
+      !referralTerms &&
+      !wheelConfig &&
+      !contestsCount &&
+      !pollsCount &&
+      !giftConfig &&
+      additionalOptionsConfig === undefined
+    )
+      return;
     try {
       localStorage.setItem(FLAGS_CACHE_KEY, JSON.stringify(flags));
     } catch {
@@ -95,6 +115,7 @@ export function useFeatureFlags() {
     flags.hasContests,
     flags.hasPolls,
     flags.giftEnabled,
+    flags.additionalOptionsVisible,
   ]);
 
   return flags;

@@ -13,6 +13,7 @@ import { formatTraffic } from '../utils/formatTraffic';
 import { getGlassColors } from '../utils/glassTheme';
 import { copyToClipboard } from '../utils/clipboard';
 import { useTheme } from '../hooks/useTheme';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import InsufficientBalancePrompt from '../components/InsufficientBalancePrompt';
 import { useCurrency } from '../hooks/useCurrency';
 import { useCloseOnSuccessNotification } from '../store/successNotification';
@@ -193,6 +194,7 @@ export default function Subscription() {
   const { isDark } = useTheme();
   const g = getGlassColors(isDark);
   const haptic = useHaptic();
+  const { additionalOptionsVisible } = useFeatureFlags();
   const [copied, setCopied] = useState(false);
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
   const destructiveConfirm = useDestructiveConfirm();
@@ -1288,7 +1290,8 @@ export default function Subscription() {
         )}
 
       {/* Additional Options (Buy Devices) */}
-      {subscription &&
+      {additionalOptionsVisible !== false &&
+        subscription &&
         (subscription.is_active || subscription.is_limited) &&
         !subscription.is_trial &&
         subscription.device_limit !== 0 && (
@@ -1369,7 +1372,8 @@ export default function Subscription() {
         )}
 
       {/* Reissue Subscription — standalone block, not dependent on device_limit */}
-      {subscription &&
+      {additionalOptionsVisible !== false &&
+        subscription &&
         (subscription.is_active || subscription.is_limited) &&
         !subscription.is_trial && (
           <div

@@ -28,6 +28,10 @@ export interface GiftEnabled {
   enabled: boolean;
 }
 
+export interface AdditionalOptionsVisible {
+  enabled: boolean;
+}
+
 export interface TelegramWidgetConfig {
   bot_username: string;
   size: 'large' | 'medium' | 'small';
@@ -258,6 +262,18 @@ export const brandingApi = {
       enabled,
     });
     return response.data;
+  },
+
+  // Get additional options section visibility (public, no auth required)
+  getAdditionalOptionsVisible: async (): Promise<AdditionalOptionsVisible> => {
+    try {
+      const response = await apiClient.get<AdditionalOptionsVisible>(
+        '/cabinet/branding/additional-options',
+      );
+      return response.data;
+    } catch {
+      return { enabled: true };
+    }
   },
 
   // Get gift enabled (public, no auth required)
