@@ -215,15 +215,16 @@ export default function Dashboard() {
   const hasPlansAnchor =
     hasNoSubscription || (isMultiTariff && (multiSubData?.subscriptions?.length ?? 0) > 0);
 
-  // `connect-devices` lives on SubscriptionCardActive, which multi-tariff skips
-  // and which is replaced by the expired card for a dead subscription.
-  const hasConnectDevicesAnchor =
-    !isMultiTariff &&
-    !subLoading &&
-    Boolean(subscription) &&
-    !subscription?.is_expired &&
-    subscription?.status !== 'disabled' &&
-    !subscription?.is_limited;
+  // `connect-devices` sits on SubscriptionCardActive in single-tariff mode
+  // (the expired card replaces it for a dead subscription), and on the first
+  // SubscriptionListCard in multi-tariff mode.
+  const hasConnectDevicesAnchor = isMultiTariff
+    ? (multiSubData?.subscriptions?.length ?? 0) > 0
+    : !subLoading &&
+      Boolean(subscription) &&
+      !subscription?.is_expired &&
+      subscription?.status !== 'disabled' &&
+      !subscription?.is_limited;
 
   // The subscription the tour hands off to /connection. In multi-tariff mode
   // `subscription` is null, so fall back to the first subscription in the list.
@@ -364,11 +365,14 @@ export default function Dashboard() {
               {t('dashboard.manageAll', 'Управление')} →
             </Link>
           </div>
-          {multiSubData.subscriptions.slice(0, 3).map((sub) => (
+          {multiSubData.subscriptions.slice(0, 3).map((sub, index) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
+              // Only the first card carries the anchor: the tour spotlights a
+              // single element and a duplicate value would be picked arbitrarily.
+              dataOnboarding={index === 0 ? 'connect-devices' : undefined}
             />
           ))}
           {multiSubData.subscriptions.length > 3 && (
