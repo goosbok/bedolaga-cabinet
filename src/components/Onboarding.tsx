@@ -207,13 +207,7 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
   return createPortal(
     <div className="onboarding-overlay" style={{ opacity: isVisible ? 1 : 0 }}>
       {/* Spotlight */}
-      <div
-        className="onboarding-spotlight"
-        style={{
-          ...getSpotlightStyle(),
-          pointerEvents: isVisible ? 'auto' : 'none',
-        }}
-      />
+      <div className="onboarding-spotlight" style={getSpotlightStyle()} />
 
       {/* Tooltip */}
       <div
@@ -275,21 +269,6 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
           </div>
         </div>
       </div>
-
-      {/* Click handler to advance on target click — only when overlay is fully visible */}
-      {targetRect && isVisible && (
-        <div
-          aria-hidden="true"
-          className="absolute cursor-pointer"
-          style={{
-            top: targetRect.top,
-            left: targetRect.left,
-            width: targetRect.width,
-            height: targetRect.height,
-          }}
-          onClick={handleNext}
-        />
-      )}
     </div>,
     document.body,
   );
