@@ -192,14 +192,23 @@ export default function Onboarding({
   // "press this button" steps can actually be pressed. That rules out a focus
   // trap (it would make the control unreachable by keyboard), so Escape is
   // wired up directly instead of through useFocusTrap's onEscape.
+  //
+  // Registered in the capture phase and stopped immediately, so that while the
+  // tour is up Escape is the tour's and nothing else's. /connection also closes
+  // itself on Escape; it guards on `isRunning`, but a bubble-phase listener here
+  // clears that flag before the guard ever reads it, so Escape both dismissed
+  // the tour and threw the user back to `/`. A capture-phase document listener
+  // always precedes bubble-phase document listeners, so this no longer depends
+  // on which component happened to mount — and register — first.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      event.stopImmediatePropagation();
       onSkipRef.current();
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   // Park focus on the tooltip as each step appears, so a screen reader announces

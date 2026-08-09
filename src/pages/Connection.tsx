@@ -94,7 +94,9 @@ export default function Connection() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // While the tour runs, Escape belongs to the tour: it dismisses the
-      // overlay and nothing else.
+      // overlay and nothing else. Defence in depth only — the tour stops the
+      // event in the capture phase, because by the time this guard runs the
+      // tour's own handler has already cleared `isRunning`.
       if (useOnboardingStore.getState().isRunning) return;
       e.preventDefault();
       handleGoBack();
