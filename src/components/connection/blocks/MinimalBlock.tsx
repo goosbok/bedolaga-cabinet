@@ -24,6 +24,7 @@ export function MinimalBlock({
         return (
           <div
             key={index}
+            data-onboarding={block.onboardingAnchor}
             className={
               isLast
                 ? 'pb-4'

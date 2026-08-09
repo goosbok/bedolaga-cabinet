@@ -23,6 +23,7 @@ export function CardsBlock({
         return (
           <div
             key={index}
+            data-onboarding={block.onboardingAnchor}
             className={`rounded-2xl border p-4 sm:p-5 ${
               isLight
                 ? 'border-dark-700/60 bg-white/80 shadow-sm'

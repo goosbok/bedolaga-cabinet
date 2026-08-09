@@ -28,6 +28,7 @@ export function AccordionBlock({
         return (
           <div
             key={index}
+            data-onboarding={block.onboardingAnchor}
             className={`overflow-hidden rounded-2xl border transition-colors ${
               isLight
                 ? isOpen

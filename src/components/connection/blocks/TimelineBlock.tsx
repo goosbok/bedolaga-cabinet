@@ -22,7 +22,7 @@ export function TimelineBlock({
         const isLast = index === visibleBlocks.length - 1;
 
         return (
-          <div key={index} className="flex gap-3 sm:gap-4">
+          <div key={index} data-onboarding={block.onboardingAnchor} className="flex gap-3 sm:gap-4">
             {/* Left column: bullet + line segment */}
             <div className="flex flex-col items-center">
               <ThemeIcon
