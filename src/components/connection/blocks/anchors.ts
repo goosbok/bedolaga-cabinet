@@ -8,6 +8,21 @@ export const ANCHOR_ADD_SUBSCRIPTION = 'install-add-subscription';
 /** Tour target for the closing "turn the VPN on" step. */
 export const ANCHOR_CONNECT = 'install-connect';
 
+/** A block is the "add subscription" step when it carries the deep-link button. */
+const hasSubscriptionLinkButton = (block: RenderBlock): boolean =>
+  Boolean(block.buttons?.some((button) => button.type === 'subscriptionLink'));
+
+/**
+ * Position of the add-subscription block in the given array, or -1.
+ *
+ * Callers that need to place something on that step must use this rather than a
+ * literal index: the panel config puts it at index 1 on phones and desktops but
+ * at index 2 on TV layouts, which carry an extra instructions block.
+ */
+export function findSubscriptionBlockIndex(blocks: RenderBlock[]): number {
+  return blocks.findIndex(hasSubscriptionLinkButton);
+}
+
 /**
  * Tags installation blocks with onboarding anchors.
  *
@@ -34,9 +49,7 @@ export function assignOnboardingAnchors(
 
   const anchors = new Map<RenderBlock, string>();
 
-  const subscriptionBlock = visible.find((b) =>
-    b.buttons?.some((button) => button.type === 'subscriptionLink'),
-  );
+  const subscriptionBlock = visible.find(hasSubscriptionLinkButton);
   if (subscriptionBlock) anchors.set(subscriptionBlock, ANCHOR_ADD_SUBSCRIPTION);
 
   const first = visible[0];

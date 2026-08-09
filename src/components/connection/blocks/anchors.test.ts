@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignOnboardingAnchors } from './anchors';
+import { assignOnboardingAnchors, findSubscriptionBlockIndex } from './anchors';
 import type { RenderBlock } from './types';
 
 const getText = (t: { en?: string } | undefined) => t?.en ?? '';
@@ -88,5 +88,34 @@ describe('assignOnboardingAnchors', () => {
     const input = [b('App Installation', extButton), b('Add Subscription', subButton)];
     assignOnboardingAnchors(input, getText);
     expect(input.every((x) => x.onboardingAnchor === undefined)).toBe(true);
+  });
+});
+
+describe('findSubscriptionBlockIndex', () => {
+  it('finds the add-subscription block at index 1 on the phone layout', () => {
+    expect(
+      findSubscriptionBlockIndex([
+        b('App Installation', extButton),
+        b('Add Subscription', subButton),
+        b('Connect and use'),
+      ]),
+    ).toBe(1);
+  });
+
+  it('finds it at index 2 on the TV layout, where an instructions block precedes it', () => {
+    expect(
+      findSubscriptionBlockIndex([
+        b('App Installation', extButton),
+        b('Installation instructions'),
+        b('Add Subscription', subButton),
+        b('Connect and use'),
+      ]),
+    ).toBe(2);
+  });
+
+  it('returns -1 when no block carries a subscription link', () => {
+    expect(
+      findSubscriptionBlockIndex([b('App Installation', extButton), b('Connect and use')]),
+    ).toBe(-1);
   });
 });

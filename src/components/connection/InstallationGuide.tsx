@@ -11,6 +11,7 @@ import type {
 import { useTheme } from '@/hooks/useTheme';
 import { CardsBlock, TimelineBlock, AccordionBlock, MinimalBlock, BlockButtons } from './blocks';
 import type { BlockRendererProps, RenderBlock } from './blocks';
+import { assignOnboardingAnchors, findSubscriptionBlockIndex } from './blocks/anchors';
 import TvQuickConnect from './TvQuickConnect';
 import { BackIcon, BookOpenIcon, ChevronIcon } from '@/components/icons';
 
@@ -202,12 +203,17 @@ export default function InstallationGuide({
   );
   let renderBlocks: RenderBlock[] = selectedApp?.blocks ?? [];
   if (selectedApp && showTvConnect && appConfig.subscriptionUrl) {
-    // install → add-subscription → connect: attach to the add step (index 1);
-    // fall back to the last block for shorter configs.
-    const idx = selectedApp.blocks.length >= 3 ? 1 : Math.max(0, selectedApp.blocks.length - 1);
+    // Attach the widget to the add-subscription step, found by its button type
+    // rather than by position: this branch only runs for the TV layouts, which
+    // carry an extra "Installation instructions" block, so the add step sits at
+    // index 2 there and at index 1 elsewhere.
+    const subscriptionIndex = findSubscriptionBlockIndex(selectedApp.blocks);
+    const idx =
+      subscriptionIndex >= 0 ? subscriptionIndex : Math.max(0, selectedApp.blocks.length - 1);
     const widget = <TvQuickConnect subscriptionUrl={appConfig.subscriptionUrl} isLight={isLight} />;
     renderBlocks = selectedApp.blocks.map((b, i) => (i === idx ? { ...b, customNode: widget } : b));
   }
+  renderBlocks = assignOnboardingAnchors(renderBlocks, getLocalizedText);
 
   return (
     <div className="space-y-6 pb-6">
