@@ -4804,9 +4804,29 @@
         "title": "Welcome!",
         "description": "This is your personal cabinet. Here you can manage your subscription, top up balance and connect devices."
       },
+      "trial": {
+        "title": "Try It for Free",
+        "description": "Press the button on this card and your free access starts right away. No payment, no card needed."
+      },
+      "plans": {
+        "title": "Plans and Subscription",
+        "description": "All available plans are here. The longer the term you choose, the less you pay per month."
+      },
       "connectDevices": {
         "title": "Connect Devices",
         "description": "Click this button to get instructions on how to connect VPN on your devices."
+      },
+      "installApp": {
+        "title": "Install the App",
+        "description": "We already know which device you are on. Press the button to install the right app."
+      },
+      "addSubscription": {
+        "title": "Add Your Subscription",
+        "description": "One tap opens the app and loads your subscription automatically. Nothing to copy or paste."
+      },
+      "connect": {
+        "title": "Connect to VPN",
+        "description": "Open the app, pick a server and press the big connect button. This is the last step, everything works on its own after that."
       },
       "balance": {
         "title": "Your Balance",
