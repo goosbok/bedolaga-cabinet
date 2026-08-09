@@ -9,11 +9,14 @@ import type { RemnawaveBlockClient, RemnawaveButtonClient, LocalizedText } from 
  */
 export type RenderBlock = RemnawaveBlockClient & { customNode?: ReactNode };
 
+/** Resolves a panel-provided localized field to the active language's string. */
+export type GetLocalizedText = (text: LocalizedText | undefined) => string;
+
 export interface BlockRendererProps {
   blocks: RenderBlock[];
   isMobile: boolean;
   isLight: boolean;
-  getLocalizedText: (text: LocalizedText | undefined) => string;
+  getLocalizedText: GetLocalizedText;
   getSvgHtml: (key: string | undefined) => string;
   renderBlockButtons: (
     buttons: RemnawaveButtonClient[] | undefined,

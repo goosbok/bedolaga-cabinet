@@ -3,7 +3,7 @@ import { ChevronDownIcon } from '@/components/icons';
 import { getColorGradient } from '@/utils/colorParser';
 import { ThemeIcon } from './ThemeIcon';
 import type { BlockRendererProps } from './types';
-import { isBlockVisible } from './visibility';
+import { getVisibleBlocks } from './visibility';
 
 export function AccordionBlock({
   blocks,
@@ -15,7 +15,7 @@ export function AccordionBlock({
 }: BlockRendererProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  const visibleBlocks = blocks.filter((b) => isBlockVisible(b, getLocalizedText));
+  const visibleBlocks = getVisibleBlocks(blocks, getLocalizedText);
 
   if (!visibleBlocks.length) return null;
 

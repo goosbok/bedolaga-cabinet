@@ -1,7 +1,7 @@
 import { getColorGradientSolid } from '@/utils/colorParser';
 import { ThemeIcon } from './ThemeIcon';
 import type { BlockRendererProps } from './types';
-import { isBlockVisible } from './visibility';
+import { getVisibleBlocks } from './visibility';
 
 export function TimelineBlock({
   blocks,
@@ -11,7 +11,7 @@ export function TimelineBlock({
   getSvgHtml,
   renderBlockButtons,
 }: BlockRendererProps) {
-  const visibleBlocks = blocks.filter((b) => isBlockVisible(b, getLocalizedText));
+  const visibleBlocks = getVisibleBlocks(blocks, getLocalizedText);
 
   if (!visibleBlocks.length) return null;
 
