@@ -28,7 +28,13 @@ beforeEach(() => {
       backing.clear();
     },
   });
-  useOnboardingStore.setState({ steps: [], stepIndex: 0, isRunning: false, hasStarted: false });
+  useOnboardingStore.setState({
+    steps: [],
+    stepIndex: 0,
+    isRunning: false,
+    hasStarted: false,
+    hasEverConnected: false,
+  });
 });
 
 afterEach(() => {
@@ -36,20 +42,26 @@ afterEach(() => {
 });
 
 describe('shouldPersistCompletion', () => {
-  it('persists when the user is standing on the closing connect step', () => {
-    expect(shouldPersistCompletion(fullTour, 2)).toBe(true);
+  it('persists when the user is standing on the closing connect step and has connected', () => {
+    expect(shouldPersistCompletion(fullTour, 2, true)).toBe(true);
+  });
+
+  it('does not persist on the connect step when the user never connected', () => {
+    // Clicking to the end of the tour is not the same as switching the VPN on:
+    // this user gets the tour again, and "Skip" is their way out.
+    expect(shouldPersistCompletion(fullTour, 2, false)).toBe(false);
   });
 
   it('does not persist when the tour ended before the connect step', () => {
-    expect(shouldPersistCompletion(shortTour, 1)).toBe(false);
+    expect(shouldPersistCompletion(shortTour, 1, true)).toBe(false);
   });
 
   it('does not persist when the connect step exists but was not reached', () => {
-    expect(shouldPersistCompletion(fullTour, 1)).toBe(false);
+    expect(shouldPersistCompletion(fullTour, 1, true)).toBe(false);
   });
 
   it('does not persist for an empty tour', () => {
-    expect(shouldPersistCompletion([], 0)).toBe(false);
+    expect(shouldPersistCompletion([], 0, true)).toBe(false);
   });
 });
 
@@ -107,13 +119,34 @@ describe('useOnboardingStore', () => {
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
   });
 
-  it('complete sets the flag when the user finished on the connect step', () => {
+  it('skip persists even on the connect step when the user never connected', () => {
     const s = useOnboardingStore.getState();
+    s.start(fullTour);
+    s.next();
+    s.next();
+    s.skip();
+    // An explicit opt-out stays an opt-out, connected or not.
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
+  });
+
+  it('complete sets the flag when the user finished on the connect step and has connected', () => {
+    const s = useOnboardingStore.getState();
+    s.setHasEverConnected(true);
     s.start(fullTour);
     s.next();
     s.next();
     s.complete();
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
+  });
+
+  it('complete leaves the flag unset on the connect step when the user never connected', () => {
+    const s = useOnboardingStore.getState();
+    s.start(fullTour);
+    s.next();
+    s.next();
+    s.complete();
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
   });
 
   it('complete leaves the flag unset when the user never got a connect step', () => {
@@ -141,6 +174,7 @@ describe('useOnboardingStore', () => {
 
   it('abort ends the tour without persisting, even on the connect step', () => {
     const s = useOnboardingStore.getState();
+    s.setHasEverConnected(true);
     s.start(fullTour);
     s.next();
     s.next();

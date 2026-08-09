@@ -15,12 +15,19 @@ const writeFlag = (): void => {
 };
 
 /**
- * A tour only counts as done once the user actually stood on the connect step.
+ * A tour only counts as done once the user stood on the connect step AND has
+ * actually connected at least once.
  *
  * Someone who never pressed "Activate Free" gets no connect step at all, and
  * would otherwise be marked done forever after a couple of dashboard steps —
  * losing exactly the user this tour exists for. They see it again next visit;
  * "Skip" is how they opt out for good.
+ *
+ * The traffic check exists for the same reason one step further along: clicking
+ * through to the last step is not the same as switching the VPN on. A user who
+ * reaches the end without ever connecting gets the tour again on their next
+ * visit — deliberately, because they have not done the thing the tour exists
+ * for. "Skip" remains their way out.
  *
  * This deliberately checks the *current* step rather than merely whether a
  * connect step exists in the list. It is not sufficient on its own, though: the
@@ -28,8 +35,12 @@ const writeFlag = (): void => {
  * that failed to render the connect block would still land here. That path is
  * closed separately by `abort()`.
  */
-export function shouldPersistCompletion(steps: OnboardingStep[], stepIndex: number): boolean {
-  return steps[stepIndex]?.target === ANCHOR_CONNECT;
+export function shouldPersistCompletion(
+  steps: OnboardingStep[],
+  stepIndex: number,
+  hasEverConnected: boolean,
+): boolean {
+  return steps[stepIndex]?.target === ANCHOR_CONNECT && hasEverConnected;
 }
 
 interface OnboardingState {
@@ -43,11 +54,17 @@ interface OnboardingState {
    * step one — or relaunch a tour they just finished.
    */
   hasStarted: boolean;
+  /**
+   * Whether any of the user's subscriptions has ever carried traffic. Published
+   * by Dashboard alongside the step list; gates `complete()`.
+   */
+  hasEverConnected: boolean;
 
   /** Begins the tour unless it was already completed or there is nothing to show. */
   start: (steps: OnboardingStep[]) => void;
   /** Replaces the step list mid-tour when the underlying state changes. */
   setSteps: (steps: OnboardingStep[]) => void;
+  setHasEverConnected: (hasEverConnected: boolean) => void;
   next: () => void;
   prev: () => void;
   /** Explicit opt-out: never show the tour again. */
@@ -69,6 +86,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   stepIndex: 0,
   isRunning: false,
   hasStarted: false,
+  hasEverConnected: false,
 
   start: (steps) => {
     if (get().hasStarted) return;
@@ -85,6 +103,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     }));
   },
 
+  setHasEverConnected: (hasEverConnected) => set({ hasEverConnected }),
+
   next: () =>
     set((state) => ({
       stepIndex: Math.min(state.stepIndex + 1, Math.max(0, state.steps.length - 1)),
@@ -98,8 +118,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   },
 
   complete: () => {
-    const { steps, stepIndex } = get();
-    if (shouldPersistCompletion(steps, stepIndex)) writeFlag();
+    const { steps, stepIndex, hasEverConnected } = get();
+    if (shouldPersistCompletion(steps, stepIndex, hasEverConnected)) writeFlag();
     set({ isRunning: false });
   },
 

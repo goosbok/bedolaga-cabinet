@@ -32,6 +32,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const startOnboarding = useOnboardingStore((state) => state.start);
   const setOnboardingSteps = useOnboardingStore((state) => state.setSteps);
+  const setOnboardingHasEverConnected = useOnboardingStore((state) => state.setHasEverConnected);
   const isOnboardingRunning = useOnboardingStore((state) => state.isRunning);
   const blockingType = useBlockingStore((state) => state.blockingType);
   const [trialError, setTrialError] = useState<string | null>(null);
@@ -229,6 +230,12 @@ export default function Dashboard() {
   // for anyone holding a subscription — expired ones included.
   const hasConnectDevicesAnchor = tourSubscriptionId !== null;
 
+  // Traffic on ANY subscription proves the user got the VPN running at least
+  // once. The store refuses to mark the tour done until that has happened.
+  const hasEverConnected =
+    (subscription?.traffic_used_gb ?? 0) > 0 ||
+    (multiSubData?.subscriptions ?? []).some((s) => s.traffic_used_gb > 0);
+
   const onboardingSteps = useMemo<OnboardingStep[]>(() => {
     const steps: OnboardingStep[] = [
       {
@@ -322,6 +329,11 @@ export default function Dashboard() {
     if (!isOnboardingRunning) return;
     setOnboardingSteps(onboardingSteps);
   }, [isOnboardingRunning, setOnboardingSteps, onboardingSteps]);
+
+  // The other half of what the store needs to decide the tour is done.
+  useEffect(() => {
+    setOnboardingHasEverConnected(hasEverConnected);
+  }, [setOnboardingHasEverConnected, hasEverConnected]);
 
   return (
     <div className="space-y-6">
