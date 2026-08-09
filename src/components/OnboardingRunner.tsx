@@ -33,16 +33,23 @@ export default function OnboardingRunner() {
   const currentUrlRef = useRef(currentUrl);
   currentUrlRef.current = currentUrl;
 
+  // `navigate` is deliberately kept out of the dependency array below. In
+  // react-router 7 its identity changes when the location changes, so listing
+  // it re-runs the effect on every navigation — which re-asserts the step's
+  // route and yanks the user straight back. Measured: clicking the tour's own
+  // "browse plans" link pushed /subscription/purchase, and 24ms later the
+  // effect pushed / on top of it, trapping the user on the dashboard.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   // Navigate once, when the tour moves onto a step that lives on another page.
-  // The current location is deliberately read through a ref instead of being a
-  // dependency: re-asserting the route on every location change would pin the
-  // user to /connection — browser Back would bounce straight forward again and
-  // every nav link would be undone within a frame.
+  // Nothing here reacts to the location itself: a user who walks away mid-step
+  // stays away, the overlay simply hides until they return.
   useEffect(() => {
     if (!targetRoute) return;
     if (currentUrlRef.current === targetRoute) return;
-    navigate(targetRoute);
-  }, [stepIndex, targetRoute, navigate]);
+    navigateRef.current(targetRoute);
+  }, [stepIndex, targetRoute]);
 
   if (!isRunning || !activeStep) return null;
 
