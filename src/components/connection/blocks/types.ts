@@ -7,7 +7,14 @@ import type { RemnawaveBlockClient, RemnawaveButtonClient, LocalizedText } from 
  * widget) that every renderer drops into the block body, so it inherits the
  * active style (cards/timeline/accordion/minimal) instead of clashing with it.
  */
-export type RenderBlock = RemnawaveBlockClient & { customNode?: ReactNode };
+export type RenderBlock = RemnawaveBlockClient & {
+  customNode?: ReactNode;
+  /**
+   * Onboarding tour target, assigned by `assignOnboardingAnchors`. Rendered as
+   * `data-onboarding` so the tour can spotlight this block.
+   */
+  onboardingAnchor?: string;
+};
 
 /** Resolves a panel-provided localized field to the active language's string. */
 export type GetLocalizedText = (text: LocalizedText | undefined) => string;
