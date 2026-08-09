@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+/** Only the four values the spotlight and tooltip are positioned from. */
+const isSameRect = (a: DOMRect, b: DOMRect): boolean =>
+  a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
+
 export interface OnboardingStep {
   target: string; // data-onboarding attribute value
   title: string;
@@ -105,22 +109,66 @@ export default function Onboarding({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.target]);
 
-  // Recalculate position on resize/scroll
+  // Recalculate position on resize/scroll, and on any relayout that moves the
+  // target.
+  //
+  // resize/scroll alone leave the cached rect stale: /connection's block list is
+  // server-driven and changes length when the user picks another platform or
+  // app, which moves the anchored block without either event firing — the
+  // spotlight then sits over whatever took over the old rect while the tooltip
+  // still describes the step. A ResizeObserver covers that without polling.
+  //
+  // It has to watch the target's *ancestors*, not just the target and <body>:
+  // switching macOS -> Linux grows <main> from 637px to 820px and pushes the
+  // anchored block down 56px while <body> stays pinned at its `min-h-viewport`
+  // floor and the block's own box never changes size at all. Observing only the
+  // target and <body> reports nothing for that half of the switch.
+  //
+  // `isVisible` is a dependency so the chain gets attached at the moment the
+  // step engine has confirmed the target is on the page — a step that navigates
+  // first would otherwise set up while its target is still unmounted.
   useEffect(() => {
-    const updatePosition = () => {
-      const target = document.querySelector(`[data-onboarding="${step.target}"]`);
-      if (target) {
-        setTargetRect(target.getBoundingClientRect());
+    const selector = `[data-onboarding="${step.target}"]`;
+    let observed: Element | null = null;
+
+    const observer = new ResizeObserver(() => updatePosition());
+
+    // Re-observe from scratch whenever the target changes identity: a relayout
+    // that swaps the block list also swaps the DOM nodes, and the old chain
+    // belongs to elements that are no longer on the page.
+    function observeChain(target: Element) {
+      observer.disconnect();
+      for (let node: Element | null = target; node; node = node.parentElement) {
+        observer.observe(node);
       }
-    };
+      observed = target;
+    }
+
+    function updatePosition() {
+      const target = document.querySelector(selector);
+      if (!target) return;
+      if (target !== observed) observeChain(target);
+      const rect = target.getBoundingClientRect();
+      // The observer can fire as a result of this component's own re-render, so
+      // commit only a rect that actually moved — otherwise the two feed back
+      // into each other.
+      setTargetRect((prev) => (prev && isSameRect(prev, rect) ? prev : rect));
+    }
+
+    updatePosition();
+    // Covers the target not being on the page yet: the step engine polls for it
+    // for ~1.3s, and <body> growing as that content mounts brings us back here
+    // to pick it up and observe its chain.
+    observer.observe(document.body);
 
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [step.target]);
+  }, [step.target, isVisible]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
