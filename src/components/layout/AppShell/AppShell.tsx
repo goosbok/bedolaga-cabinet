@@ -20,6 +20,7 @@ import WebSocketNotifications from '@/components/WebSocketNotifications';
 import CampaignBonusNotifier from '@/components/CampaignBonusNotifier';
 import SuccessNotificationModal from '@/components/SuccessNotificationModal';
 import { PromptDialogHost } from '@/components/PromptDialogHost';
+import OnboardingRunner from '@/components/OnboardingRunner';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import TicketNotificationBell from '@/components/TicketNotificationBell';
 import {
@@ -188,6 +189,7 @@ export function AppShell({ children }: AppShellProps) {
       <CampaignBonusNotifier />
       <SuccessNotificationModal />
       <PromptDialogHost />
+      <OnboardingRunner />
 
       {/* Desktop Header */}
       <header className="fixed left-0 right-0 top-0 z-50 hidden border-b border-dark-800/50 bg-dark-950/95 lg:block">

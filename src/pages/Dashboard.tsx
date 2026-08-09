@@ -9,7 +9,8 @@ import { subscriptionApi } from '../api/subscription';
 import { referralApi } from '../api/referral';
 import { balanceApi } from '../api/balance';
 import { wheelApi } from '../api/wheel';
-import Onboarding, { useOnboarding } from '../components/Onboarding';
+import type { OnboardingStep } from '../components/Onboarding';
+import { useOnboardingStore } from '../store/onboarding';
 import PromoOffersSection from '../components/PromoOffersSection';
 import NewsSection from '../components/news/NewsSection';
 import SubscriptionCardActive from '../components/dashboard/SubscriptionCardActive';
@@ -29,8 +30,9 @@ export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const refreshUser = useAuthStore((state) => state.refreshUser);
   const queryClient = useQueryClient();
-  const { isCompleted: isOnboardingCompleted, complete: completeOnboarding } = useOnboarding();
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const startOnboarding = useOnboardingStore((state) => state.start);
+  const setOnboardingSteps = useOnboardingStore((state) => state.setSteps);
+  const isOnboardingRunning = useOnboardingStore((state) => state.isRunning);
   const blockingType = useBlockingStore((state) => state.blockingType);
   const [trialError, setTrialError] = useState<string | null>(null);
 
@@ -204,52 +206,122 @@ export default function Dashboard() {
     (s) => !s.is_trial && (s.status === 'active' || s.status === 'limited'),
   );
 
-  // Show onboarding for new users after data loads
-  useEffect(() => {
-    if (!isOnboardingCompleted && !subLoading && !refLoading && !blockingType) {
-      const timer = setTimeout(() => setShowOnboarding(true), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isOnboardingCompleted, subLoading, refLoading, blockingType]);
+  // Which anchors exist right now. Each mirrors the render condition of the
+  // element that carries it — see the truth table for this task. A step whose
+  // anchor is missing costs the user a blank overlay and is then dropped, so
+  // the step list must never outrun what is on screen.
 
-  const onboardingSteps = useMemo(() => {
-    type Placement = 'top' | 'bottom' | 'left' | 'right';
-    const steps: Array<{
-      target: string;
-      title: string;
-      description: string;
-      placement: Placement;
-    }> = [
+  // Rendered by the multi-tariff list block or the no-subscription block.
+  const hasPlansAnchor =
+    hasNoSubscription || (isMultiTariff && (multiSubData?.subscriptions?.length ?? 0) > 0);
+
+  // `connect-devices` lives on SubscriptionCardActive, which multi-tariff skips
+  // and which is replaced by the expired card for a dead subscription.
+  const hasConnectDevicesAnchor =
+    !isMultiTariff &&
+    !subLoading &&
+    Boolean(subscription) &&
+    !subscription?.is_expired &&
+    subscription?.status !== 'disabled' &&
+    !subscription?.is_limited;
+
+  // The subscription the tour hands off to /connection. In multi-tariff mode
+  // `subscription` is null, so fall back to the first subscription in the list.
+  const tourSubscriptionId = subscription?.id ?? multiSubData?.subscriptions?.[0]?.id ?? null;
+
+  const onboardingSteps = useMemo<OnboardingStep[]>(() => {
+    const steps: OnboardingStep[] = [
       {
         target: 'welcome',
         title: t('onboarding.steps.welcome.title'),
         description: t('onboarding.steps.welcome.description'),
         placement: 'bottom',
-      },
-      {
-        target: 'balance',
-        title: t('onboarding.steps.balance.title'),
-        description: t('onboarding.steps.balance.description'),
-        placement: 'bottom',
+        route: '/',
       },
     ];
 
-    if (subscription?.subscription_url) {
-      steps.splice(1, 0, {
+    if (hasNoSubscription && trialInfo?.is_available) {
+      steps.push({
+        target: 'trial-card',
+        title: t('onboarding.steps.trial.title'),
+        description: t('onboarding.steps.trial.description'),
+        placement: 'bottom',
+        route: '/',
+      });
+    }
+
+    if (hasPlansAnchor) {
+      steps.push({
+        target: 'view-plans',
+        title: t('onboarding.steps.plans.title'),
+        description: t('onboarding.steps.plans.description'),
+        placement: 'top',
+        route: '/',
+      });
+    }
+
+    if (hasConnectDevicesAnchor) {
+      steps.push({
         target: 'connect-devices',
         title: t('onboarding.steps.connectDevices.title'),
         description: t('onboarding.steps.connectDevices.description'),
         placement: 'bottom',
+        route: '/',
       });
     }
 
-    return steps;
-  }, [t, subscription]);
+    if (tourSubscriptionId !== null) {
+      const connectionRoute = `/connection?sub=${tourSubscriptionId}`;
 
-  const handleOnboardingComplete = () => {
-    completeOnboarding();
-    setShowOnboarding(false);
-  };
+      steps.push(
+        {
+          target: 'install-app',
+          title: t('onboarding.steps.installApp.title'),
+          description: t('onboarding.steps.installApp.description'),
+          placement: 'bottom',
+          route: connectionRoute,
+        },
+        {
+          target: 'install-add-subscription',
+          title: t('onboarding.steps.addSubscription.title'),
+          description: t('onboarding.steps.addSubscription.description'),
+          placement: 'bottom',
+          route: connectionRoute,
+        },
+        {
+          target: 'install-connect',
+          title: t('onboarding.steps.connect.title'),
+          description: t('onboarding.steps.connect.description'),
+          placement: 'top',
+          route: connectionRoute,
+        },
+      );
+    }
+
+    return steps;
+  }, [
+    t,
+    hasNoSubscription,
+    trialInfo?.is_available,
+    hasPlansAnchor,
+    hasConnectDevicesAnchor,
+    tourSubscriptionId,
+  ]);
+
+  // Start once the data the step list depends on has settled. The store ignores
+  // repeat calls, so re-publishing a changed list never rewinds the tour.
+  useEffect(() => {
+    if (subLoading || refLoading || blockingType) return;
+    const timer = setTimeout(() => startOnboarding(onboardingSteps), 500);
+    return () => clearTimeout(timer);
+  }, [subLoading, refLoading, blockingType, startOnboarding, onboardingSteps]);
+
+  // Keep a running tour in sync: activating the trial creates a subscription,
+  // which unlocks the connect and installation steps without a reload.
+  useEffect(() => {
+    if (!isOnboardingRunning) return;
+    setOnboardingSteps(onboardingSteps);
+  }, [isOnboardingRunning, setOnboardingSteps, onboardingSteps]);
 
   return (
     <div className="space-y-6">
@@ -310,6 +382,7 @@ export default function Dashboard() {
           {hasActivePaid ? (
             <Link
               to="/subscription/purchase"
+              data-onboarding="view-plans"
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500/15 p-3.5 text-sm font-medium text-accent-400 transition-all hover:bg-accent-500/25"
             >
               <span className="text-base">+</span>{' '}
@@ -318,6 +391,7 @@ export default function Dashboard() {
           ) : (
             <Link
               to="/subscription/purchase"
+              data-onboarding="view-plans"
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500 p-3.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-600"
             >
               <span className="text-base">+</span>{' '}
@@ -377,10 +451,12 @@ export default function Dashboard() {
               balanceRubles={balanceData?.balance_rubles || 0}
               activateTrialMutation={activateTrialMutation}
               trialError={trialError}
+              dataOnboarding="trial-card"
             />
           )}
           <Link
             to="/subscription/purchase"
+            data-onboarding="view-plans"
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500 p-3.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-600"
           >
             <span className="text-base">+</span>{' '}
@@ -418,15 +494,6 @@ export default function Dashboard() {
 
       {/* News Section */}
       <NewsSection />
-
-      {/* Onboarding Tutorial */}
-      {showOnboarding && (
-        <Onboarding
-          steps={onboardingSteps}
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingComplete}
-        />
-      )}
     </div>
   );
 }

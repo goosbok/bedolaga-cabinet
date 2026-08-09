@@ -1,45 +1,41 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useFocusTrap } from '../hooks/useFocusTrap';
 
-interface OnboardingStep {
+export interface OnboardingStep {
   target: string; // data-onboarding attribute value
   title: string;
   description: string;
   placement: 'top' | 'bottom' | 'left' | 'right';
+  /** Route this step lives on. The runner navigates here before the step shows. */
+  route?: string;
 }
 
 interface OnboardingProps {
   steps: OnboardingStep[];
+  /** Active step, owned by the caller so the tour survives route changes. */
+  stepIndex: number;
+  onStepChange: (index: number) => void;
   onComplete: () => void;
   onSkip: () => void;
+  /**
+   * The last step's target never appeared, so the tour ends without having been
+   * walked to the end. Distinct from `onComplete` on purpose: the caller must be
+   * able to tell "the user finished" from "we gave up".
+   */
+  onAbort: () => void;
 }
 
-const STORAGE_KEY = 'onboarding_completed';
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useOnboarding() {
-  const [isCompleted, setIsCompleted] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY) === 'true';
-  });
-
-  const complete = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, 'true');
-    setIsCompleted(true);
-  }, []);
-
-  const reset = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setIsCompleted(false);
-  }, []);
-
-  return { isCompleted, complete, reset };
-}
-
-export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProps) {
+export default function Onboarding({
+  steps,
+  stepIndex,
+  onStepChange,
+  onComplete,
+  onSkip,
+  onAbort,
+}: OnboardingProps) {
   const { t } = useTranslation();
-  const [currentStep, setCurrentStep] = useState(0);
+  const currentStep = stepIndex;
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -48,6 +44,21 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  const onStepChangeRef = useRef(onStepChange);
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  }, [onStepChange]);
+
+  const onAbortRef = useRef(onAbort);
+  useEffect(() => {
+    onAbortRef.current = onAbort;
+  }, [onAbort]);
+
+  const onSkipRef = useRef(onSkip);
+  useEffect(() => {
+    onSkipRef.current = onSkip;
+  }, [onSkip]);
 
   const step = steps[currentStep];
 
@@ -78,9 +89,11 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
         return;
       }
       if (isLastStep) {
-        onCompleteRef.current();
+        // Ran out of attempts on the final step: the user was never actually
+        // shown it, so this is an abort, not a completion.
+        onAbortRef.current();
       } else {
-        setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+        onStepChangeRef.current(Math.min(currentStep + 1, steps.length - 1));
       }
     };
 
@@ -111,7 +124,7 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      onStepChange(currentStep + 1);
     } else {
       onComplete();
     }
@@ -119,7 +132,7 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
 
   const handlePrev = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      onStepChange(currentStep - 1);
     }
   };
 
@@ -127,16 +140,27 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
     onSkip();
   };
 
-  // Trap focus inside the tooltip while the tour runs; Esc skips it.
-  // lockScroll stays off so scrollIntoView can bring each target into view.
-  const trapRef = useFocusTrap<HTMLDivElement>(true, { onEscape: handleSkip, lockScroll: false });
-  const setTooltipNode = useCallback(
-    (node: HTMLDivElement | null) => {
-      tooltipRef.current = node;
-      trapRef.current = node;
-    },
-    [trapRef],
-  );
+  // The tour is deliberately non-modal: the highlighted control stays live so
+  // "press this button" steps can actually be pressed. That rules out a focus
+  // trap (it would make the control unreachable by keyboard), so Escape is
+  // wired up directly instead of through useFocusTrap's onEscape.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onSkipRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Park focus on the tooltip as each step appears, so a screen reader announces
+  // the explanation and Tab continues from here into the page — onto the
+  // highlighted control — rather than cycling inside the tooltip.
+  useEffect(() => {
+    if (!isVisible) return;
+    tooltipRef.current?.focus({ preventScroll: true });
+  }, [isVisible, currentStep]);
 
   // Calculate tooltip position
   const getTooltipStyle = (): React.CSSProperties => {
@@ -211,14 +235,19 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
 
       {/* Tooltip */}
       <div
-        ref={setTooltipNode}
+        ref={tooltipRef}
         role="dialog"
-        aria-modal="true"
+        // No aria-modal: the rest of the UI stays interactive on purpose, and
+        // claiming modality would hide the highlighted control from AT.
         aria-labelledby="onboarding-title"
         aria-describedby="onboarding-desc"
+        tabIndex={-1}
         className={`onboarding-tooltip tooltip-${step.placement}`}
         style={{
           ...getTooltipStyle(),
+          // Not redundant with the stylesheet's `pointer-events-auto`: the
+          // 'none' branch is the point — it keeps the faded-out tooltip from
+          // swallowing clicks while a step transitions.
           pointerEvents: isVisible ? 'auto' : 'none',
         }}
       >
