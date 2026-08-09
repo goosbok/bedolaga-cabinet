@@ -73,6 +73,17 @@ describe('assignOnboardingAnchors', () => {
     expect(anchorsOf([b('Add Subscription', subButton)])).toEqual(['install-add-subscription']);
   });
 
+  it('anchors the first subscription block when more than one carries the button', () => {
+    expect(
+      anchorsOf([
+        b('App Installation', extButton),
+        b('Add Subscription', subButton),
+        b('If the subscription is not added', subButton),
+        b('Connect and use'),
+      ]),
+    ).toEqual(['install-app', 'install-add-subscription', undefined, 'install-connect']);
+  });
+
   it('assigns no subscription anchor when no block has a subscriptionLink button', () => {
     expect(anchorsOf([b('App Installation', extButton), b('Connect and use')])).toEqual([
       'install-app',

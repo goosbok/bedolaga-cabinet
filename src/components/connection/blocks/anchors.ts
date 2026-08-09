@@ -8,6 +8,16 @@ export const ANCHOR_ADD_SUBSCRIPTION = 'install-add-subscription';
 /** Tour target for the closing "turn the VPN on" step. */
 export const ANCHOR_CONNECT = 'install-connect';
 
+/**
+ * Every anchor this module can assign. Narrower than `string` so a typo in a
+ * consumer — a renderer's `data-onboarding`, a tour step's target — is a
+ * compile error rather than a step that silently never fires.
+ */
+export type OnboardingAnchor =
+  | typeof ANCHOR_INSTALL_APP
+  | typeof ANCHOR_ADD_SUBSCRIPTION
+  | typeof ANCHOR_CONNECT;
+
 /** A block is the "add subscription" step when it carries the deep-link button. */
 const hasSubscriptionLinkButton = (block: RenderBlock): boolean =>
   Boolean(block.buttons?.some((button) => button.type === 'subscriptionLink'));
@@ -37,6 +47,14 @@ export function findSubscriptionBlockIndex(blocks: RenderBlock[]): number {
  * The subscription block wins any collision, because it is the step the user
  * must actually complete. A block that gets no anchor is simply not a tour
  * target; the tour engine skips steps whose target is absent.
+ *
+ * If several blocks carry a subscriptionLink button — a panel admin may well
+ * put a second one on the Linux "If the subscription is not added" block — the
+ * first one wins: it is the step the user reaches first.
+ *
+ * Must run AFTER any `customNode` injection. `customNode` counts towards
+ * visibility, so injecting one can make an otherwise-empty block visible and
+ * change which block is first or last. Nothing in the code enforces this.
  */
 export function assignOnboardingAnchors(
   blocks: RenderBlock[],
@@ -47,7 +65,7 @@ export function assignOnboardingAnchors(
   const visible = getVisibleBlocks(blocks, getLocalizedText);
   if (!visible.length) return blocks;
 
-  const anchors = new Map<RenderBlock, string>();
+  const anchors = new Map<RenderBlock, OnboardingAnchor>();
 
   const subscriptionBlock = visible.find(hasSubscriptionLinkButton);
   if (subscriptionBlock) anchors.set(subscriptionBlock, ANCHOR_ADD_SUBSCRIPTION);

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { RemnawaveBlockClient, RemnawaveButtonClient, LocalizedText } from '@/types';
+import type { OnboardingAnchor } from './anchors';
 
 /**
  * A block to render. Beyond the panel's data (title/description/buttons), it may
@@ -13,7 +14,7 @@ export type RenderBlock = RemnawaveBlockClient & {
    * Onboarding tour target, assigned by `assignOnboardingAnchors`. Rendered as
    * `data-onboarding` so the tour can spotlight this block.
    */
-  onboardingAnchor?: string;
+  onboardingAnchor?: OnboardingAnchor;
 };
 
 /** Resolves a panel-provided localized field to the active language's string. */
