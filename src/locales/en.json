@@ -4814,7 +4814,7 @@
       },
       "connectDevices": {
         "title": "Connect Devices",
-        "description": "Click this button to get instructions on how to connect VPN on your devices."
+        "description": "Press your subscription — it opens the guide for connecting VPN on your devices."
       },
       "installApp": {
         "title": "Install the App",
