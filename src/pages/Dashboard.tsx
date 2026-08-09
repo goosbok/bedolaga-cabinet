@@ -22,7 +22,7 @@ import { promoApi } from '../api/promo';
 import PendingGiftCard from '../components/dashboard/PendingGiftCard';
 import SubscriptionListCard from '../components/subscription/SubscriptionListCard';
 import { API } from '../config/constants';
-import { ChevronRightIcon, StarIcon } from '@/components/icons';
+import { ChevronRightIcon, DevicesIcon, StarIcon } from '@/components/icons';
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -215,20 +215,19 @@ export default function Dashboard() {
   const hasPlansAnchor =
     hasNoSubscription || (isMultiTariff && (multiSubData?.subscriptions?.length ?? 0) > 0);
 
-  // `connect-devices` sits on SubscriptionCardActive in single-tariff mode
-  // (the expired card replaces it for a dead subscription), and on the first
-  // SubscriptionListCard in multi-tariff mode.
-  const hasConnectDevicesAnchor = isMultiTariff
-    ? (multiSubData?.subscriptions?.length ?? 0) > 0
-    : !subLoading &&
-      Boolean(subscription) &&
-      !subscription?.is_expired &&
-      subscription?.status !== 'disabled' &&
-      !subscription?.is_limited;
-
   // The subscription the tour hands off to /connection. In multi-tariff mode
   // `subscription` is null, so fall back to the first subscription in the list.
   const tourSubscriptionId = subscription?.id ?? multiSubData?.subscriptions?.[0]?.id ?? null;
+
+  // Traffic on that same subscription, read the same way. Zero means the user
+  // has never actually connected, which turns the guide link into a nudge.
+  const tourSubscriptionTrafficGb =
+    subscription?.traffic_used_gb ?? multiSubData?.subscriptions?.[0]?.traffic_used_gb ?? 0;
+
+  // `connect-devices` sits on the installation-guide link below the
+  // subscription block, which renders in both single- and multi-tariff mode
+  // for anyone holding a subscription — expired ones included.
+  const hasConnectDevicesAnchor = tourSubscriptionId !== null;
 
   const onboardingSteps = useMemo<OnboardingStep[]>(() => {
     const steps: OnboardingStep[] = [
@@ -365,14 +364,11 @@ export default function Dashboard() {
               {t('dashboard.manageAll', 'Управление')} →
             </Link>
           </div>
-          {multiSubData.subscriptions.slice(0, 3).map((sub, index) => (
+          {multiSubData.subscriptions.slice(0, 3).map((sub) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
-              // Only the first card carries the anchor: the tour spotlights a
-              // single element and a duplicate value would be picked arbitrarily.
-              dataOnboarding={index === 0 ? 'connect-devices' : undefined}
             />
           ))}
           {multiSubData.subscriptions.length > 3 && (
@@ -467,6 +463,46 @@ export default function Dashboard() {
             {t('subscriptions.browsePlans', 'Посмотреть тарифы и купить подписку')}
           </Link>
         </div>
+      )}
+
+      {/* Permanent way into the installation guide. Otherwise it is reachable
+          only via Subscription → card → «Подключить устройство», and that path
+          thins out exactly when a lapsed user needs it most. Zero traffic on the
+          linked subscription means the user never connected, so the link turns
+          into a nudge — encouraging, never alarming. */}
+      {tourSubscriptionId !== null && (
+        <Link
+          to={`/connection?sub=${tourSubscriptionId}`}
+          data-onboarding="connect-devices"
+          className={
+            tourSubscriptionTrafficGb === 0
+              ? 'flex w-full items-center gap-3 rounded-2xl bg-accent-500/15 p-3.5 text-left transition-colors hover:bg-accent-500/25'
+              : 'flex w-full items-center gap-2.5 rounded-2xl border border-white/10 p-3.5 text-sm font-medium text-dark-300 transition-colors hover:bg-white/5 hover:text-dark-100'
+          }
+        >
+          {tourSubscriptionTrafficGb === 0 ? (
+            <>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500/20 text-accent-400">
+                <DevicesIcon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-dark-50">
+                  {t('dashboard.connectGuide.nudgeTitle')}
+                </span>
+                <span className="mt-0.5 block text-xs text-dark-400">
+                  {t('dashboard.connectGuide.nudgeDescription')}
+                </span>
+              </span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-accent-400" />
+            </>
+          ) : (
+            <>
+              <DevicesIcon className="h-4 w-4 shrink-0 opacity-60" />
+              <span className="flex-1">{t('dashboard.connectGuide.link')}</span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-dark-500" />
+            </>
+          )}
+        </Link>
       )}
 
       {/* Promo Offers */}

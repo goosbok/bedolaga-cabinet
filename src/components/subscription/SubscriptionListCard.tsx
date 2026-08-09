@@ -68,12 +68,9 @@ function StatusBadge({
 export default function SubscriptionListCard({
   subscription,
   onClick,
-  dataOnboarding,
 }: {
   subscription: SubscriptionListItem;
   onClick: () => void;
-  /** Onboarding tour target placed on the card's outer element. */
-  dataOnboarding?: string;
 }) {
   const { t, i18n } = useTranslation();
   const { isDark } = useTheme();
@@ -129,7 +126,6 @@ export default function SubscriptionListCard({
   return (
     <button
       onClick={handleClick}
-      data-onboarding={dataOnboarding}
       className="w-full rounded-2xl border p-4 text-left transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
       style={{ background: bgColor, borderColor }}
     >

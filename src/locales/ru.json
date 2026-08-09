@@ -324,7 +324,12 @@
     },
     "manageAll": "Управлять всеми",
     "showAll": "Показать все",
-    "subscriptions": "Подписки"
+    "subscriptions": "Подписки",
+    "connectGuide": {
+      "link": "Как подключить устройство",
+      "nudgeTitle": "Вы ещё не подключились",
+      "nudgeDescription": "Покажем, как включить VPN на вашем устройстве"
+    }
   },
   "subscription": {
     "title": "Подписка",

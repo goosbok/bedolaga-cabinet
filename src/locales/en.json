@@ -311,7 +311,12 @@
     },
     "manageAll": "Manage all",
     "showAll": "Show all",
-    "subscriptions": "Subscriptions"
+    "subscriptions": "Subscriptions",
+    "connectGuide": {
+      "link": "How to connect a device",
+      "nudgeTitle": "You haven't connected yet",
+      "nudgeDescription": "We'll show you how to turn the VPN on"
+    }
   },
   "subscription": {
     "title": "Subscription",
