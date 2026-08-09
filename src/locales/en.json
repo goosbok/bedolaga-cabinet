@@ -4819,7 +4819,7 @@
       },
       "connectDevices": {
         "title": "Connect Devices",
-        "description": "Press your subscription — it opens the guide for connecting VPN on your devices."
+        "description": "This is the step-by-step guide for turning the VPN on. Press it to open."
       },
       "installApp": {
         "title": "Install the App",
