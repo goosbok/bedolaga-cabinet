@@ -275,6 +275,9 @@ export default function Dashboard() {
         description: t('onboarding.steps.trial.description'),
         placement: 'bottom',
         route: '/',
+        // Activating the trial creates a subscription, which republishes this
+        // list without the trial step — the tour moves on by itself.
+        awaitsUserAction: true,
       });
     }
 
@@ -285,6 +288,9 @@ export default function Dashboard() {
         description: t('onboarding.steps.dashboardSubscription.description'),
         placement: 'bottom',
         route: '/',
+        // Tapping the card navigates to the subscription screen, where the
+        // runner's landing detection picks the tour up.
+        awaitsUserAction: true,
       });
     }
 
@@ -311,6 +317,9 @@ export default function Dashboard() {
           description: t('onboarding.steps.subConnectDevice.description'),
           placement: 'bottom',
           route: subscriptionRoute,
+          // Connect Device navigates to /connection, which is where the next
+          // steps live — the runner follows the user there.
+          awaitsUserAction: true,
         });
       }
 

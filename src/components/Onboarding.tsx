@@ -6,6 +6,19 @@ import { useTranslation } from 'react-i18next';
 const isSameRect = (a: DOMRect, b: DOMRect): boolean =>
   a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
 
+/**
+ * How long an `awaitsUserAction` step is shown without a "Next" before one
+ * appears anyway.
+ *
+ * The escape hatch is not optional: two of those steps can dead-end. Trial
+ * activation can fail (the dashboard renders an error and no subscription is
+ * created), and "Connect Device" is disabled once the user is at their device
+ * limit, so pressing it does nothing. Without this the tooltip would offer only
+ * "Skip", which ends the tour for good — the worst possible answer for someone
+ * who just hit an error.
+ */
+const ACTION_STEP_NEXT_DELAY_MS = 10_000;
+
 export interface OnboardingStep {
   target: string; // data-onboarding attribute value
   title: string;
@@ -13,6 +26,18 @@ export interface OnboardingStep {
   placement: 'top' | 'bottom' | 'left' | 'right';
   /** Route this step lives on. The runner navigates here before the step shows. */
   route?: string;
+  /**
+   * This step asks the user to press something real, and that press is what
+   * advances the tour — activating the trial republishes the step list, and
+   * tapping through to another screen is picked up by the runner's
+   * landing detection. The tooltip hides "Next" so the tour cannot be clicked
+   * past the doing (it comes back after `ACTION_STEP_NEXT_DELAY_MS`, see above).
+   *
+   * Leave it unset on a step that has nothing to press, and on one whose control
+   * leads *off* the tour's path — a purchase page, an app store, a `happ://`
+   * link — because there pressing it must not be the only way forward.
+   */
+  awaitsUserAction?: boolean;
 }
 
 interface OnboardingProps {
@@ -42,6 +67,7 @@ export default function Onboarding({
   const currentStep = stepIndex;
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [actionStepTimedOut, setActionStepTimedOut] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const onCompleteRef = useRef(onComplete);
@@ -170,17 +196,25 @@ export default function Onboarding({
     };
   }, [step.target, isVisible]);
 
+  // Give every step that waits on the user its own grace period: the timer is
+  // torn down and restarted whenever the step changes, by index or by identity
+  // (activating the trial rebuilds the list under a stable index).
+  useEffect(() => {
+    setActionStepTimedOut(false);
+    if (!step.awaitsUserAction) return;
+    const timer = window.setTimeout(() => setActionStepTimedOut(true), ACTION_STEP_NEXT_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentStep, step.target, step.awaitsUserAction]);
+
+  // An action step hides "Next" so the only way on is doing the thing — until
+  // the grace period above expires and hands the user a way out regardless.
+  const showNext = !step.awaitsUserAction || actionStepTimedOut;
+
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       onStepChange(currentStep + 1);
     } else {
       onComplete();
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentStep > 0) {
-      onStepChange(currentStep - 1);
     }
   };
 
@@ -342,16 +376,13 @@ export default function Onboarding({
           </button>
 
           <div className="flex gap-2">
-            {currentStep > 0 && (
-              <button onClick={handlePrev} className="btn-ghost px-3 py-1.5 text-sm">
-                {t('common.back', 'Back')}
+            {showNext && (
+              <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
+                {currentStep === steps.length - 1
+                  ? t('onboarding.finish', 'Finish')
+                  : t('common.next', 'Next')}
               </button>
             )}
-            <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
-              {currentStep === steps.length - 1
-                ? t('onboarding.finish', 'Finish')
-                : t('common.next', 'Next')}
-            </button>
           </div>
         </div>
       </div>
