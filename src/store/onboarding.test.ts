@@ -171,6 +171,17 @@ describe('useOnboardingStore', () => {
     expect(useOnboardingStore.getState().stepIndex).toBe(0);
   });
 
+  it('goTo jumps to a later step and clamps out of range', () => {
+    const s = useOnboardingStore.getState();
+    s.start(fullTour);
+    s.goTo(2);
+    expect(useOnboardingStore.getState().stepIndex).toBe(2);
+    s.goTo(99);
+    expect(useOnboardingStore.getState().stepIndex).toBe(2);
+    s.goTo(-5);
+    expect(useOnboardingStore.getState().stepIndex).toBe(0);
+  });
+
   it('setSteps is ignored when the tour is not running', () => {
     useOnboardingStore.getState().setSteps(fullTour);
     expect(useOnboardingStore.getState().steps).toHaveLength(0);

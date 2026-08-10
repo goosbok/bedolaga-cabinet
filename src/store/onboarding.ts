@@ -67,6 +67,12 @@ interface OnboardingState {
   setHasEverConnected: (hasEverConnected: boolean) => void;
   next: () => void;
   prev: () => void;
+  /**
+   * Jumps straight to a step. Used when the user follows a step's instruction
+   * and navigates themselves — the tour meets them where they landed instead of
+   * waiting on the page they left.
+   */
+  goTo: (index: number) => void;
   /** Explicit opt-out: never show the tour again. */
   skip: () => void;
   /** Reached the end of the list; persists only per `shouldPersistCompletion`. */
@@ -111,6 +117,11 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     })),
 
   prev: () => set((state) => ({ stepIndex: Math.max(0, state.stepIndex - 1) })),
+
+  goTo: (index) =>
+    set((state) => ({
+      stepIndex: Math.max(0, Math.min(index, Math.max(0, state.steps.length - 1))),
+    })),
 
   skip: () => {
     writeFlag();

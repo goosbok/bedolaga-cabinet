@@ -21,6 +21,7 @@ export default function OnboardingRunner() {
   const isRunning = useOnboardingStore((state) => state.isRunning);
   const next = useOnboardingStore((state) => state.next);
   const prev = useOnboardingStore((state) => state.prev);
+  const goTo = useOnboardingStore((state) => state.goTo);
   const skip = useOnboardingStore((state) => state.skip);
   const complete = useOnboardingStore((state) => state.complete);
   const abort = useOnboardingStore((state) => state.abort);
@@ -50,6 +51,20 @@ export default function OnboardingRunner() {
     if (currentUrlRef.current === targetRoute) return;
     navigateRef.current(targetRoute);
   }, [stepIndex, targetRoute]);
+
+  // The user did what the step told them to. Steps like "tap your subscription"
+  // are instructions to navigate, so obeying one must not look like leaving the
+  // tour — without this the overlay simply vanished, while pressing "Next"
+  // instead kept it alive, which is precisely backwards.
+  //
+  // Only later steps are considered, so walking backwards or wandering off to an
+  // unrelated page still just hides the overlay until the user returns.
+  useEffect(() => {
+    if (!isRunning || !targetRoute) return;
+    if (currentUrl === targetRoute) return;
+    const landed = steps.findIndex((step, i) => i > stepIndex && step.route === currentUrl);
+    if (landed !== -1) goTo(landed);
+  }, [currentUrl, isRunning, targetRoute, stepIndex, steps, goTo]);
 
   if (!isRunning || !activeStep) return null;
 
