@@ -4814,7 +4814,7 @@
       },
       "subLink": {
         "title": "Your Subscription Key",
-        "description": "This is your subscription key. Open it and you get the connection instructions. You can also pass it to family or friends so they can connect too."
+        "description": "This is your subscription key. Copy it with the button on the right and paste it into your browser's address bar — that opens a page with the connection guide. You can share the same key with family and friends so they can connect too."
       },
       "subConnectDevice": {
         "title": "Add a Device",
