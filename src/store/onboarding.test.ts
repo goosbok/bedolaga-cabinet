@@ -10,7 +10,11 @@ const step = (target: string, route?: string): OnboardingStep => ({
   route,
 });
 
-const fullTour = [step('welcome'), step('connect-devices'), step('install-connect', '/connection')];
+const fullTour = [
+  step('welcome'),
+  step('sub-connect-device', '/subscriptions/1'),
+  step('install-connect', '/connection'),
+];
 const shortTour = [step('welcome'), step('trial-card')];
 
 // vitest runs in the `node` environment here, so localStorage has to be supplied.

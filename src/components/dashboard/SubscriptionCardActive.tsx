@@ -24,6 +24,8 @@ interface SubscriptionCardActiveProps {
   refreshTrafficMutation: UseMutationResult<unknown, unknown, void, unknown>;
   trafficRefreshCooldown: number;
   connectedDevices: number;
+  /** Onboarding tour target placed on the tile that opens the subscription. */
+  dataOnboarding?: string;
 }
 
 export default function SubscriptionCardActive({
@@ -32,6 +34,7 @@ export default function SubscriptionCardActive({
   refreshTrafficMutation,
   trafficRefreshCooldown,
   connectedDevices,
+  dataOnboarding,
 }: SubscriptionCardActiveProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -173,7 +176,6 @@ export default function SubscriptionCardActive({
             navigate(`/connection?sub=${subscription.id}`);
           }}
           className={`mb-2.5 flex w-full items-center gap-3.5 rounded-[14px] p-3.5 text-left transition-shadow duration-300${isAtDeviceLimit ? 'cursor-not-allowed opacity-50' : ''}`}
-          data-onboarding="connect-devices"
           style={{ fontFamily: 'inherit' }}
         >
           {/* Monitor icon */}
@@ -271,6 +273,7 @@ export default function SubscriptionCardActive({
             (DESIGN.md Status-Hue Lockout) was wrong. */}
         <Link
           to={`/subscriptions/${subscription.id}`}
+          data-onboarding={dataOnboarding}
           className="flex-1 rounded-[14px] p-3.5 transition-colors"
           style={{
             background: g.innerBg,

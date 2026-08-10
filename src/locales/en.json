@@ -311,12 +311,7 @@
     },
     "manageAll": "Manage all",
     "showAll": "Show all",
-    "subscriptions": "Subscriptions",
-    "connectGuide": {
-      "link": "How to connect a device",
-      "nudgeTitle": "You haven't connected yet",
-      "nudgeDescription": "We'll show you how to turn the VPN on"
-    }
+    "subscriptions": "Subscriptions"
   },
   "subscription": {
     "title": "Subscription",
@@ -4813,13 +4808,21 @@
         "title": "Try It for Free",
         "description": "Press the “Activate Free” button — your access starts right away. No payment, no card needed."
       },
-      "plans": {
-        "title": "Plans and Subscription",
-        "description": "All available plans are here. The longer the term you choose, the less you pay per month."
+      "dashboardSubscription": {
+        "title": "Open Your Subscription",
+        "description": "Press your subscription card to open it. Everything about it lives there: traffic, devices, your subscription key and plan changes."
       },
-      "connectDevices": {
-        "title": "Connect Devices",
-        "description": "This is the step-by-step guide for turning the VPN on. Press it to open."
+      "subLink": {
+        "title": "Your Subscription Key",
+        "description": "This is your subscription key. Open it and you get the connection instructions. You can also pass it to family or friends so they can connect too."
+      },
+      "subConnectDevice": {
+        "title": "Add a Device",
+        "description": "This is where you add a new device. The counter next to it shows how many of the devices you are allowed are already connected."
+      },
+      "subUpgrade": {
+        "title": "Choose a Plan",
+        "description": "When your trial runs out, or you need more traffic and devices, this is where you pick a plan."
       },
       "installApp": {
         "title": "Install the App",

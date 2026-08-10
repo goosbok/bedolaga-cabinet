@@ -815,6 +815,7 @@ export default function Subscription() {
                     navigate(subscriptionId ? `/connection?sub=${subscriptionId}` : '/connection');
                   }}
                   className={`mb-5 flex w-full items-center gap-3.5 rounded-[14px] p-3.5 text-left transition-shadow duration-300${isAtDeviceLimit ? 'cursor-not-allowed opacity-50' : ''}`}
+                  data-onboarding="sub-connect-device"
                   style={{ fontFamily: 'inherit' }}
                 >
                   <div
@@ -892,7 +893,7 @@ export default function Subscription() {
 
               {/* ─── Subscription URL ─── */}
               {displayedConnectionUrl && !shouldHideConnectionLink && (
-                <div className="mb-5 flex gap-2">
+                <div className="mb-5 flex gap-2" data-onboarding="sub-link">
                   <code
                     className="block min-w-0 flex-1 truncate whitespace-nowrap rounded-[10px] px-3 py-2 font-mono text-[11px] text-dark-50/30"
                     style={{
@@ -1266,7 +1267,11 @@ export default function Subscription() {
       )}
 
       {/* Purchase / Renewal CTA */}
-      <PurchaseCTAButton subscription={subscription} isMultiTariff={isMultiTariff} />
+      <PurchaseCTAButton
+        subscription={subscription}
+        isMultiTariff={isMultiTariff}
+        dataOnboarding="sub-upgrade"
+      />
 
       {/* Delete expired subscription */}
       {isMultiTariff &&

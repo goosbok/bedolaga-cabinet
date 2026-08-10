@@ -22,7 +22,7 @@ import { promoApi } from '../api/promo';
 import PendingGiftCard from '../components/dashboard/PendingGiftCard';
 import SubscriptionListCard from '../components/subscription/SubscriptionListCard';
 import { API } from '../config/constants';
-import { ChevronRightIcon, DevicesIcon, StarIcon } from '@/components/icons';
+import { ChevronRightIcon, StarIcon } from '@/components/icons';
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -212,23 +212,44 @@ export default function Dashboard() {
   // anchor is missing costs the user a blank overlay and is then dropped, so
   // the step list must never outrun what is on screen.
 
-  // Rendered by the multi-tariff list block or the no-subscription block.
-  const hasPlansAnchor =
-    hasNoSubscription || (isMultiTariff && (multiSubData?.subscriptions?.length ?? 0) > 0);
+  // The subscription the tour walks through. In multi-tariff mode `subscription`
+  // is null, so fall back to the first one in the list — the same card that
+  // carries the `dashboard-subscription` anchor.
+  const tourSubscription = subscription ?? multiSubData?.subscriptions?.[0] ?? null;
+  const tourSubscriptionId = tourSubscription?.id ?? null;
 
-  // The subscription the tour hands off to /connection. In multi-tariff mode
-  // `subscription` is null, so fall back to the first subscription in the list.
-  const tourSubscriptionId = subscription?.id ?? multiSubData?.subscriptions?.[0]?.id ?? null;
+  // `dashboard-subscription` sits on the first SubscriptionListCard in
+  // multi-tariff mode, and on the tariff tile inside SubscriptionCardActive
+  // otherwise — where an expired, disabled or limited subscription swaps that
+  // card out for SubscriptionCardExpired, which carries no anchor.
+  const hasDashboardSubscriptionAnchor = isMultiTariff
+    ? (multiSubData?.subscriptions?.length ?? 0) > 0
+    : !subLoading &&
+      Boolean(subscription) &&
+      !subscription?.is_expired &&
+      subscription?.status !== 'disabled' &&
+      !subscription?.is_limited;
 
-  // Traffic on that same subscription, read the same way. Zero means the user
-  // has never actually connected, which turns the guide link into a nudge.
-  const tourSubscriptionTrafficGb =
-    subscription?.traffic_used_gb ?? multiSubData?.subscriptions?.[0]?.traffic_used_gb ?? 0;
+  // Both subscription-screen anchors hang off the connection URL: the Connect
+  // Device button renders only with a `subscription_url`, and the URL block
+  // additionally disappears when the plan suppresses the link. The multi-tariff
+  // list payload carries no `hide_subscription_link`, so that half of the
+  // condition only bites in single-tariff mode.
+  const hasSubscriptionUrl = Boolean(tourSubscription?.subscription_url);
+  const hasSubLinkAnchor = hasSubscriptionUrl && !subscription?.hide_subscription_link;
 
-  // `connect-devices` sits on the installation-guide link below the
-  // subscription block, which renders in both single- and multi-tariff mode
-  // for anyone holding a subscription — expired ones included.
-  const hasConnectDevicesAnchor = tourSubscriptionId !== null;
+  // The upgrade prompt renders for every subscription state — only its copy
+  // changes — with one exception: PurchaseCTAButton bails out entirely for a
+  // live daily tariff in multi-tariff mode, which renews itself and has
+  // nothing to sell.
+  const hasSubUpgradeAnchor =
+    tourSubscriptionId !== null &&
+    !(
+      isMultiTariff &&
+      tourSubscription?.is_daily === true &&
+      tourSubscription.status !== 'expired' &&
+      tourSubscription.status !== 'disabled'
+    );
 
   // Traffic on ANY subscription proves the user got the VPN running at least
   // once. The store refuses to mark the tour done until that has happened.
@@ -257,28 +278,51 @@ export default function Dashboard() {
       });
     }
 
-    if (hasPlansAnchor) {
+    if (hasDashboardSubscriptionAnchor) {
       steps.push({
-        target: 'view-plans',
-        title: t('onboarding.steps.plans.title'),
-        description: t('onboarding.steps.plans.description'),
-        placement: 'top',
-        route: '/',
-      });
-    }
-
-    if (hasConnectDevicesAnchor) {
-      steps.push({
-        target: 'connect-devices',
-        title: t('onboarding.steps.connectDevices.title'),
-        description: t('onboarding.steps.connectDevices.description'),
+        target: 'dashboard-subscription',
+        title: t('onboarding.steps.dashboardSubscription.title'),
+        description: t('onboarding.steps.dashboardSubscription.description'),
         placement: 'bottom',
         route: '/',
       });
     }
 
     if (tourSubscriptionId !== null) {
+      // Everything that matters about a subscription lives on its own screen,
+      // so the tour goes there rather than shortcutting past it.
+      const subscriptionRoute = `/subscriptions/${tourSubscriptionId}`;
       const connectionRoute = `/connection?sub=${tourSubscriptionId}`;
+
+      if (hasSubLinkAnchor) {
+        steps.push({
+          target: 'sub-link',
+          title: t('onboarding.steps.subLink.title'),
+          description: t('onboarding.steps.subLink.description'),
+          placement: 'bottom',
+          route: subscriptionRoute,
+        });
+      }
+
+      if (hasSubscriptionUrl) {
+        steps.push({
+          target: 'sub-connect-device',
+          title: t('onboarding.steps.subConnectDevice.title'),
+          description: t('onboarding.steps.subConnectDevice.description'),
+          placement: 'bottom',
+          route: subscriptionRoute,
+        });
+      }
+
+      if (hasSubUpgradeAnchor) {
+        steps.push({
+          target: 'sub-upgrade',
+          title: t('onboarding.steps.subUpgrade.title'),
+          description: t('onboarding.steps.subUpgrade.description'),
+          placement: 'top',
+          route: subscriptionRoute,
+        });
+      }
 
       steps.push(
         {
@@ -310,8 +354,10 @@ export default function Dashboard() {
     t,
     hasNoSubscription,
     trialInfo?.is_available,
-    hasPlansAnchor,
-    hasConnectDevicesAnchor,
+    hasDashboardSubscriptionAnchor,
+    hasSubLinkAnchor,
+    hasSubscriptionUrl,
+    hasSubUpgradeAnchor,
     tourSubscriptionId,
   ]);
 
@@ -376,11 +422,15 @@ export default function Dashboard() {
               {t('dashboard.manageAll', 'Управление')} →
             </Link>
           </div>
-          {multiSubData.subscriptions.slice(0, 3).map((sub) => (
+          {multiSubData.subscriptions.slice(0, 3).map((sub, index) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
+              // Only the first card carries the anchor: the tour spotlights a
+              // single element and a duplicate value would be picked
+              // arbitrarily. It is also the subscription the later steps use.
+              dataOnboarding={index === 0 ? 'dashboard-subscription' : undefined}
             />
           ))}
           {multiSubData.subscriptions.length > 3 && (
@@ -394,7 +444,6 @@ export default function Dashboard() {
           {hasActivePaid ? (
             <Link
               to="/subscription/purchase"
-              data-onboarding="view-plans"
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500/15 p-3.5 text-sm font-medium text-accent-400 transition-all hover:bg-accent-500/25"
             >
               <span className="text-base">+</span>{' '}
@@ -403,7 +452,6 @@ export default function Dashboard() {
           ) : (
             <Link
               to="/subscription/purchase"
-              data-onboarding="view-plans"
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500 p-3.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-600"
             >
               <span className="text-base">+</span>{' '}
@@ -444,6 +492,10 @@ export default function Dashboard() {
               refreshTrafficMutation={refreshTrafficMutation}
               trafficRefreshCooldown={trafficRefreshCooldown}
               connectedDevices={devicesData?.total ?? 0}
+              // Single-tariff counterpart of the first list card: the tile the
+              // user taps to open the subscription. Mutually exclusive with the
+              // multi-tariff list above, so only one anchor is ever on the page.
+              dataOnboarding="dashboard-subscription"
             />
           ) : null}
         </>
@@ -468,53 +520,12 @@ export default function Dashboard() {
           )}
           <Link
             to="/subscription/purchase"
-            data-onboarding="view-plans"
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent-500 p-3.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-600"
           >
             <span className="text-base">+</span>{' '}
             {t('subscriptions.browsePlans', 'Посмотреть тарифы и купить подписку')}
           </Link>
         </div>
-      )}
-
-      {/* Permanent way into the installation guide. Otherwise it is reachable
-          only via Subscription → card → «Подключить устройство», and that path
-          thins out exactly when a lapsed user needs it most. Zero traffic on the
-          linked subscription means the user never connected, so the link turns
-          into a nudge — encouraging, never alarming. */}
-      {tourSubscriptionId !== null && (
-        <Link
-          to={`/connection?sub=${tourSubscriptionId}`}
-          data-onboarding="connect-devices"
-          className={
-            tourSubscriptionTrafficGb === 0
-              ? 'flex w-full items-center gap-3 rounded-2xl bg-accent-500/15 p-3.5 text-left transition-colors hover:bg-accent-500/25'
-              : 'flex w-full items-center gap-2.5 rounded-2xl border border-white/10 p-3.5 text-sm font-medium text-dark-300 transition-colors hover:bg-white/5 hover:text-dark-100'
-          }
-        >
-          {tourSubscriptionTrafficGb === 0 ? (
-            <>
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500/20 text-accent-400">
-                <DevicesIcon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-dark-50">
-                  {t('dashboard.connectGuide.nudgeTitle')}
-                </span>
-                <span className="mt-0.5 block text-xs text-dark-400">
-                  {t('dashboard.connectGuide.nudgeDescription')}
-                </span>
-              </span>
-              <ChevronRightIcon className="h-4 w-4 shrink-0 text-accent-400" />
-            </>
-          ) : (
-            <>
-              <DevicesIcon className="h-4 w-4 shrink-0 opacity-60" />
-              <span className="flex-1">{t('dashboard.connectGuide.link')}</span>
-              <ChevronRightIcon className="h-4 w-4 shrink-0 text-dark-500" />
-            </>
-          )}
-        </Link>
       )}
 
       {/* Promo Offers */}
