@@ -310,6 +310,21 @@ export default function Dashboard() {
         });
       }
 
+      // The upgrade step comes before Connect Device, and the order is
+      // load-bearing: Connect Device navigates off this screen, so the runner
+      // jumps to the first later step on the destination route. Anything left
+      // between them would be skipped by every user who follows the
+      // instruction — which is exactly the user we want to reach.
+      if (hasSubUpgradeAnchor) {
+        steps.push({
+          target: 'sub-upgrade',
+          title: t('onboarding.steps.subUpgrade.title'),
+          description: t('onboarding.steps.subUpgrade.description'),
+          placement: 'top',
+          route: subscriptionRoute,
+        });
+      }
+
       if (hasSubscriptionUrl) {
         steps.push({
           target: 'sub-connect-device',
@@ -320,16 +335,6 @@ export default function Dashboard() {
           // Connect Device navigates to /connection, which is where the next
           // steps live — the runner follows the user there.
           awaitsUserAction: true,
-        });
-      }
-
-      if (hasSubUpgradeAnchor) {
-        steps.push({
-          target: 'sub-upgrade',
-          title: t('onboarding.steps.subUpgrade.title'),
-          description: t('onboarding.steps.subUpgrade.description'),
-          placement: 'top',
-          route: subscriptionRoute,
         });
       }
 
