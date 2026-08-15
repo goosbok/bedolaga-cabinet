@@ -2,7 +2,38 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import Onboarding from './Onboarding';
-import { useOnboardingStore } from '../store/onboarding';
+import { isOnboardingDismissed, useOnboardingStore } from '../store/onboarding';
+
+/**
+ * Sections the bot's main menu deep-links into. Every one of these is a normal
+ * destination a returning user picks on purpose, so the redirect below is
+ * deliberately limited to them — payment results, gift links, merges and the
+ * like must never be hijacked.
+ */
+const BOT_ENTRY_ROUTES = new Set([
+  '/subscription',
+  '/subscriptions',
+  '/balance',
+  '/referral',
+  '/support',
+  '/info',
+  '/profile',
+]);
+
+/** One nudge per webview session, so reopening the app cannot loop the user. */
+const ENTRY_NUDGE_KEY = '__onboarding_entry_nudge';
+
+const alreadyNudged = (): boolean => {
+  try {
+    if (sessionStorage.getItem(ENTRY_NUDGE_KEY)) return true;
+    sessionStorage.setItem(ENTRY_NUDGE_KEY, '1');
+    return false;
+  } catch {
+    // Private mode or a locked-down webview: skip the nudge rather than risk
+    // redirecting on every render with no way to remember we already did.
+    return true;
+  }
+};
 
 /**
  * Drives the onboarding tour for the whole app.
@@ -42,6 +73,23 @@ export default function OnboardingRunner() {
   // effect pushed / on top of it, trapping the user on the dashboard.
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
+
+  // Every button in the bot's main menu opens the cabinet at its own section, so
+  // a user arriving from Telegram usually never touches the dashboard — and the
+  // step list is produced there, which meant the tour simply never started for
+  // them. Send a first-time visitor to the dashboard once, on entry; from there
+  // the tour takes over and walks them back out through its own steps.
+  //
+  // Entry only, and only from the menu's own destinations: someone who opens
+  // /balance later in the session, or lands on a payment result, is left alone.
+  const entryPathRef = useRef(location.pathname);
+  useEffect(() => {
+    if (useOnboardingStore.getState().hasStarted) return;
+    if (isOnboardingDismissed()) return;
+    if (!BOT_ENTRY_ROUTES.has(entryPathRef.current)) return;
+    if (alreadyNudged()) return;
+    navigateRef.current('/', { replace: true });
+  }, []);
 
   // Navigate once, when the tour moves onto a step that lives on another page.
   // Nothing here reacts to the location itself: a user who walks away mid-step

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ONBOARDING_STORAGE_KEY, shouldPersistCompletion, useOnboardingStore } from './onboarding';
+import {
+  isOnboardingDismissed,
+  ONBOARDING_STORAGE_KEY,
+  shouldPersistCompletion,
+  useOnboardingStore,
+} from './onboarding';
 import type { OnboardingStep } from '../components/Onboarding';
 
 const step = (target: string, route?: string): OnboardingStep => ({
@@ -197,5 +202,39 @@ describe('useOnboardingStore', () => {
     s.abort();
     expect(useOnboardingStore.getState().isRunning).toBe(false);
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
+  });
+
+  // Guards the entry redirect in OnboardingRunner: it has to decide whether the
+  // tour is still in play before any step list exists, so it cannot ask `start`.
+  describe('isOnboardingDismissed', () => {
+    it('is false for a user who has never seen the tour', () => {
+      expect(isOnboardingDismissed()).toBe(false);
+    });
+
+    it('is true once the user skipped', () => {
+      useOnboardingStore.getState().start(shortTour);
+      useOnboardingStore.getState().skip();
+      expect(isOnboardingDismissed()).toBe(true);
+    });
+
+    it('stays false after a tour that ended without connecting', () => {
+      const s = useOnboardingStore.getState();
+      s.start(fullTour);
+      s.next();
+      s.next();
+      // Walked to the end, but the VPN was never switched on.
+      s.complete();
+      expect(isOnboardingDismissed()).toBe(false);
+    });
+
+    it('agrees with start(): dismissed means start is a no-op', () => {
+      useOnboardingStore.getState().start(shortTour);
+      useOnboardingStore.getState().skip();
+      useOnboardingStore.setState({ hasStarted: false, steps: [], isRunning: false });
+
+      expect(isOnboardingDismissed()).toBe(true);
+      useOnboardingStore.getState().start(fullTour);
+      expect(useOnboardingStore.getState().isRunning).toBe(false);
+    });
   });
 });

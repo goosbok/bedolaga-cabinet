@@ -15,6 +15,14 @@ const writeFlag = (): void => {
 };
 
 /**
+ * Whether the user is done with the tour for good — same check `start` makes.
+ *
+ * Exported so callers can decide *before* a step list exists whether the tour
+ * is still in play. Used to avoid nudging a user who already opted out.
+ */
+export const isOnboardingDismissed = (): boolean => readFlag();
+
+/**
  * A tour only counts as done once the user stood on the connect step AND has
  * actually connected at least once.
  *
