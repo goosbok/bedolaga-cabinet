@@ -1,6 +1,7 @@
 import { getColorGradient } from '@/utils/colorParser';
 import { ThemeIcon } from './ThemeIcon';
 import type { BlockRendererProps } from './types';
+import { getVisibleBlocks } from './visibility';
 
 export function MinimalBlock({
   blocks,
@@ -10,13 +11,7 @@ export function MinimalBlock({
   getSvgHtml,
   renderBlockButtons,
 }: BlockRendererProps) {
-  const visibleBlocks = blocks.filter(
-    (b) =>
-      getLocalizedText(b.title) ||
-      getLocalizedText(b.description) ||
-      b.buttons?.length ||
-      b.customNode,
-  );
+  const visibleBlocks = getVisibleBlocks(blocks, getLocalizedText);
 
   if (!visibleBlocks.length) return null;
 
@@ -29,6 +24,7 @@ export function MinimalBlock({
         return (
           <div
             key={index}
+            data-onboarding={block.onboardingAnchor}
             className={
               isLast
                 ? 'pb-4'

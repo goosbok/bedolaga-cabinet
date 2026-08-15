@@ -293,4 +293,16 @@ apiClient.interceptors.response.use(
   },
 );
 
+/**
+ * True when the backend answered 404.
+ *
+ * The cabinet ships independently of the bot, so it can call an endpoint a
+ * running bot version does not serve yet. For optional data that is the same
+ * as "nothing configured", callers fall back to a neutral default instead of
+ * surfacing an error — a missing feature must not stall the page that would
+ * otherwise render fine without it.
+ */
+export const isNotFound = (error: unknown): boolean =>
+  axios.isAxiosError(error) && error.response?.status === 404;
+
 export default apiClient;

@@ -1,6 +1,7 @@
 import { getColorGradientSolid } from '@/utils/colorParser';
 import { ThemeIcon } from './ThemeIcon';
 import type { BlockRendererProps } from './types';
+import { getVisibleBlocks } from './visibility';
 
 export function TimelineBlock({
   blocks,
@@ -10,13 +11,7 @@ export function TimelineBlock({
   getSvgHtml,
   renderBlockButtons,
 }: BlockRendererProps) {
-  const visibleBlocks = blocks.filter(
-    (b) =>
-      getLocalizedText(b.title) ||
-      getLocalizedText(b.description) ||
-      b.buttons?.length ||
-      b.customNode,
-  );
+  const visibleBlocks = getVisibleBlocks(blocks, getLocalizedText);
 
   if (!visibleBlocks.length) return null;
 
@@ -27,7 +22,7 @@ export function TimelineBlock({
         const isLast = index === visibleBlocks.length - 1;
 
         return (
-          <div key={index} className="flex gap-3 sm:gap-4">
+          <div key={index} data-onboarding={block.onboardingAnchor} className="flex gap-3 sm:gap-4">
             {/* Left column: bullet + line segment */}
             <div className="flex flex-col items-center">
               <ThemeIcon

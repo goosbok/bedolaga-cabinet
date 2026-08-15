@@ -1,4 +1,4 @@
-import apiClient from './client';
+import apiClient, { isNotFound } from './client';
 import type { SupportConfig } from '../types';
 
 export interface FaqPage {
@@ -107,8 +107,16 @@ export const infoApi = {
     return response.data;
   },
 
+  // A bot without this endpoint has no per-tab visibility switches, so every
+  // built-in tab is visible — the same answer the page assumes when the data
+  // is absent.
   getVisibility: async (): Promise<InfoVisibility> => {
-    const response = await apiClient.get<InfoVisibility>('/cabinet/info/visibility');
-    return response.data;
+    try {
+      const response = await apiClient.get<InfoVisibility>('/cabinet/info/visibility');
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return { faq: true, rules: true, privacy: true, offer: true };
+      throw error;
+    }
   },
 };

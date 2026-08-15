@@ -9,7 +9,8 @@ import { subscriptionApi } from '../api/subscription';
 import { referralApi } from '../api/referral';
 import { balanceApi } from '../api/balance';
 import { wheelApi } from '../api/wheel';
-import Onboarding, { useOnboarding } from '../components/Onboarding';
+import type { OnboardingStep } from '../components/Onboarding';
+import { useOnboardingStore } from '../store/onboarding';
 import PromoOffersSection from '../components/PromoOffersSection';
 import NewsSection from '../components/news/NewsSection';
 import SubscriptionCardActive from '../components/dashboard/SubscriptionCardActive';
@@ -29,8 +30,10 @@ export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const refreshUser = useAuthStore((state) => state.refreshUser);
   const queryClient = useQueryClient();
-  const { isCompleted: isOnboardingCompleted, complete: completeOnboarding } = useOnboarding();
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const startOnboarding = useOnboardingStore((state) => state.start);
+  const setOnboardingSteps = useOnboardingStore((state) => state.setSteps);
+  const setOnboardingHasEverConnected = useOnboardingStore((state) => state.setHasEverConnected);
+  const isOnboardingRunning = useOnboardingStore((state) => state.isRunning);
   const blockingType = useBlockingStore((state) => state.blockingType);
   const [trialError, setTrialError] = useState<string | null>(null);
 
@@ -204,52 +207,193 @@ export default function Dashboard() {
     (s) => !s.is_trial && (s.status === 'active' || s.status === 'limited'),
   );
 
-  // Show onboarding for new users after data loads
-  useEffect(() => {
-    if (!isOnboardingCompleted && !subLoading && !refLoading && !blockingType) {
-      const timer = setTimeout(() => setShowOnboarding(true), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isOnboardingCompleted, subLoading, refLoading, blockingType]);
+  // Which anchors exist right now. Each mirrors the render condition of the
+  // element that carries it — see the truth table for this task. A step whose
+  // anchor is missing costs the user a blank overlay and is then dropped, so
+  // the step list must never outrun what is on screen.
 
-  const onboardingSteps = useMemo(() => {
-    type Placement = 'top' | 'bottom' | 'left' | 'right';
-    const steps: Array<{
-      target: string;
-      title: string;
-      description: string;
-      placement: Placement;
-    }> = [
+  // The subscription the tour walks through. In multi-tariff mode `subscription`
+  // is null, so fall back to the first one in the list — the same card that
+  // carries the `dashboard-subscription` anchor.
+  const tourSubscription = subscription ?? multiSubData?.subscriptions?.[0] ?? null;
+  const tourSubscriptionId = tourSubscription?.id ?? null;
+
+  // `dashboard-subscription` sits on the first SubscriptionListCard in
+  // multi-tariff mode, and on the tariff tile inside SubscriptionCardActive
+  // otherwise — where an expired, disabled or limited subscription swaps that
+  // card out for SubscriptionCardExpired, which carries no anchor.
+  const hasDashboardSubscriptionAnchor = isMultiTariff
+    ? (multiSubData?.subscriptions?.length ?? 0) > 0
+    : !subLoading &&
+      Boolean(subscription) &&
+      !subscription?.is_expired &&
+      subscription?.status !== 'disabled' &&
+      !subscription?.is_limited;
+
+  // Both subscription-screen anchors hang off the connection URL: the Connect
+  // Device button renders only with a `subscription_url`, and the URL block
+  // additionally disappears when the plan suppresses the link. The multi-tariff
+  // list payload carries no `hide_subscription_link`, so that half of the
+  // condition only bites in single-tariff mode.
+  const hasSubscriptionUrl = Boolean(tourSubscription?.subscription_url);
+  const hasSubLinkAnchor = hasSubscriptionUrl && !subscription?.hide_subscription_link;
+
+  // The upgrade prompt renders for every subscription state — only its copy
+  // changes — with one exception: PurchaseCTAButton bails out entirely for a
+  // live daily tariff in multi-tariff mode, which renews itself and has
+  // nothing to sell.
+  const hasSubUpgradeAnchor =
+    tourSubscriptionId !== null &&
+    !(
+      isMultiTariff &&
+      tourSubscription?.is_daily === true &&
+      tourSubscription.status !== 'expired' &&
+      tourSubscription.status !== 'disabled'
+    );
+
+  // Traffic on ANY subscription proves the user got the VPN running at least
+  // once. The store refuses to mark the tour done until that has happened.
+  const hasEverConnected =
+    (subscription?.traffic_used_gb ?? 0) > 0 ||
+    (multiSubData?.subscriptions ?? []).some((s) => s.traffic_used_gb > 0);
+
+  const onboardingSteps = useMemo<OnboardingStep[]>(() => {
+    const steps: OnboardingStep[] = [
       {
         target: 'welcome',
         title: t('onboarding.steps.welcome.title'),
         description: t('onboarding.steps.welcome.description'),
         placement: 'bottom',
-      },
-      {
-        target: 'balance',
-        title: t('onboarding.steps.balance.title'),
-        description: t('onboarding.steps.balance.description'),
-        placement: 'bottom',
+        route: '/',
       },
     ];
 
-    if (subscription?.subscription_url) {
-      steps.splice(1, 0, {
-        target: 'connect-devices',
-        title: t('onboarding.steps.connectDevices.title'),
-        description: t('onboarding.steps.connectDevices.description'),
+    if (hasNoSubscription && trialInfo?.is_available) {
+      steps.push({
+        target: 'trial-card',
+        title: t('onboarding.steps.trial.title'),
+        description: t('onboarding.steps.trial.description'),
         placement: 'bottom',
+        route: '/',
+        // Activating the trial creates a subscription, which republishes this
+        // list without the trial step — the tour moves on by itself.
+        awaitsUserAction: true,
       });
     }
 
-    return steps;
-  }, [t, subscription]);
+    if (hasDashboardSubscriptionAnchor) {
+      steps.push({
+        target: 'dashboard-subscription',
+        title: t('onboarding.steps.dashboardSubscription.title'),
+        description: t('onboarding.steps.dashboardSubscription.description'),
+        placement: 'bottom',
+        route: '/',
+        // Tapping the card navigates to the subscription screen, where the
+        // runner's landing detection picks the tour up.
+        awaitsUserAction: true,
+      });
+    }
 
-  const handleOnboardingComplete = () => {
-    completeOnboarding();
-    setShowOnboarding(false);
-  };
+    if (tourSubscriptionId !== null) {
+      // Everything that matters about a subscription lives on its own screen,
+      // so the tour goes there rather than shortcutting past it.
+      const subscriptionRoute = `/subscriptions/${tourSubscriptionId}`;
+      const connectionRoute = `/connection?sub=${tourSubscriptionId}`;
+
+      if (hasSubLinkAnchor) {
+        steps.push({
+          target: 'sub-link',
+          title: t('onboarding.steps.subLink.title'),
+          description: t('onboarding.steps.subLink.description'),
+          placement: 'bottom',
+          route: subscriptionRoute,
+        });
+      }
+
+      // The upgrade step comes before Connect Device, and the order is
+      // load-bearing: Connect Device navigates off this screen, so the runner
+      // jumps to the first later step on the destination route. Anything left
+      // between them would be skipped by every user who follows the
+      // instruction — which is exactly the user we want to reach.
+      if (hasSubUpgradeAnchor) {
+        steps.push({
+          target: 'sub-upgrade',
+          title: t('onboarding.steps.subUpgrade.title'),
+          description: t('onboarding.steps.subUpgrade.description'),
+          placement: 'top',
+          route: subscriptionRoute,
+        });
+      }
+
+      if (hasSubscriptionUrl) {
+        steps.push({
+          target: 'sub-connect-device',
+          title: t('onboarding.steps.subConnectDevice.title'),
+          description: t('onboarding.steps.subConnectDevice.description'),
+          placement: 'bottom',
+          route: subscriptionRoute,
+          // Connect Device navigates to /connection, which is where the next
+          // steps live — the runner follows the user there.
+          awaitsUserAction: true,
+        });
+      }
+
+      steps.push(
+        {
+          target: 'install-app',
+          title: t('onboarding.steps.installApp.title'),
+          description: t('onboarding.steps.installApp.description'),
+          placement: 'bottom',
+          route: connectionRoute,
+        },
+        {
+          target: 'install-add-subscription',
+          title: t('onboarding.steps.addSubscription.title'),
+          description: t('onboarding.steps.addSubscription.description'),
+          placement: 'bottom',
+          route: connectionRoute,
+        },
+        {
+          target: 'install-connect',
+          title: t('onboarding.steps.connect.title'),
+          description: t('onboarding.steps.connect.description'),
+          placement: 'top',
+          route: connectionRoute,
+        },
+      );
+    }
+
+    return steps;
+  }, [
+    t,
+    hasNoSubscription,
+    trialInfo?.is_available,
+    hasDashboardSubscriptionAnchor,
+    hasSubLinkAnchor,
+    hasSubscriptionUrl,
+    hasSubUpgradeAnchor,
+    tourSubscriptionId,
+  ]);
+
+  // Start once the data the step list depends on has settled. The store ignores
+  // repeat calls, so re-publishing a changed list never rewinds the tour.
+  useEffect(() => {
+    if (subLoading || refLoading || blockingType) return;
+    const timer = setTimeout(() => startOnboarding(onboardingSteps), 500);
+    return () => clearTimeout(timer);
+  }, [subLoading, refLoading, blockingType, startOnboarding, onboardingSteps]);
+
+  // Keep a running tour in sync: activating the trial creates a subscription,
+  // which unlocks the connect and installation steps without a reload.
+  useEffect(() => {
+    if (!isOnboardingRunning) return;
+    setOnboardingSteps(onboardingSteps);
+  }, [isOnboardingRunning, setOnboardingSteps, onboardingSteps]);
+
+  // The other half of what the store needs to decide the tour is done.
+  useEffect(() => {
+    setOnboardingHasEverConnected(hasEverConnected);
+  }, [setOnboardingHasEverConnected, hasEverConnected]);
 
   return (
     <div className="space-y-6">
@@ -292,11 +436,15 @@ export default function Dashboard() {
               {t('dashboard.manageAll', 'Управление')} →
             </Link>
           </div>
-          {multiSubData.subscriptions.slice(0, 3).map((sub) => (
+          {multiSubData.subscriptions.slice(0, 3).map((sub, index) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
+              // Only the first card carries the anchor: the tour spotlights a
+              // single element and a duplicate value would be picked
+              // arbitrarily. It is also the subscription the later steps use.
+              dataOnboarding={index === 0 ? 'dashboard-subscription' : undefined}
             />
           ))}
           {multiSubData.subscriptions.length > 3 && (
@@ -358,6 +506,10 @@ export default function Dashboard() {
               refreshTrafficMutation={refreshTrafficMutation}
               trafficRefreshCooldown={trafficRefreshCooldown}
               connectedDevices={devicesData?.total ?? 0}
+              // Single-tariff counterpart of the first list card: the tile the
+              // user taps to open the subscription. Mutually exclusive with the
+              // multi-tariff list above, so only one anchor is ever on the page.
+              dataOnboarding="dashboard-subscription"
             />
           ) : null}
         </>
@@ -377,6 +529,7 @@ export default function Dashboard() {
               balanceRubles={balanceData?.balance_rubles || 0}
               activateTrialMutation={activateTrialMutation}
               trialError={trialError}
+              dataOnboarding="trial-card"
             />
           )}
           <Link
@@ -418,15 +571,6 @@ export default function Dashboard() {
 
       {/* News Section */}
       <NewsSection />
-
-      {/* Onboarding Tutorial */}
-      {showOnboarding && (
-        <Onboarding
-          steps={onboardingSteps}
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingComplete}
-        />
-      )}
     </div>
   );
 }

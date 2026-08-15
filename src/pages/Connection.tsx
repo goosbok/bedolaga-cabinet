@@ -11,6 +11,7 @@ import { resolveTemplate, hasTemplates } from '../utils/templateEngine';
 import { openAppScheme } from '../utils/openAppScheme';
 import { isHappCryptolinkMode, resolveConnectionUrlForUi } from '../utils/connectionLink';
 import { useAuthStore } from '../store/auth';
+import { useOnboardingStore } from '../store/onboarding';
 import type { AppConfig, RemnawavePlatformData } from '../types';
 import InstallationGuide from '../components/connection/InstallationGuide';
 
@@ -91,10 +92,14 @@ export default function Connection() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        handleGoBack();
-      }
+      if (e.key !== 'Escape') return;
+      // While the tour runs, Escape belongs to the tour: it dismisses the
+      // overlay and nothing else. Defence in depth only — the tour stops the
+      // event in the capture phase, because by the time this guard runs the
+      // tour's own handler has already cleared `isRunning`.
+      if (useOnboardingStore.getState().isRunning) return;
+      e.preventDefault();
+      handleGoBack();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);

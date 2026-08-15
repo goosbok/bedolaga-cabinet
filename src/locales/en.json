@@ -4804,9 +4804,37 @@
         "title": "Welcome!",
         "description": "This is your personal cabinet. Here you can manage your subscription, top up balance and connect devices."
       },
-      "connectDevices": {
-        "title": "Connect Devices",
-        "description": "Click this button to get instructions on how to connect VPN on your devices."
+      "trial": {
+        "title": "Try It for Free",
+        "description": "Press the “Activate Free” button — your access starts right away. No payment, no card needed."
+      },
+      "dashboardSubscription": {
+        "title": "Open Your Subscription",
+        "description": "Press your subscription card to open it. Everything about it lives there: traffic, devices, your subscription key and plan changes."
+      },
+      "subLink": {
+        "title": "Your Subscription Key",
+        "description": "This is your subscription key. The button on the right copies it: opened in a browser it shows the connection guide, and the same link can be shared with family and friends."
+      },
+      "subConnectDevice": {
+        "title": "Add a Device",
+        "description": "This is where you add a new device. The counter next to it shows how many of the devices you are allowed are already connected."
+      },
+      "subUpgrade": {
+        "title": "Choose a Plan",
+        "description": "When your trial runs out, or you need more traffic and devices, this is where you pick a plan."
+      },
+      "installApp": {
+        "title": "Install the App",
+        "description": "We already know which device you are on. Press the button to install the right app. If the App Store says it is unavailable in your region, there is a button next to it with a guide."
+      },
+      "addSubscription": {
+        "title": "Add Your Subscription",
+        "description": "One tap opens the app and loads your subscription automatically. Nothing to copy or paste."
+      },
+      "connect": {
+        "title": "Connect to VPN",
+        "description": "Open the app, pick a server and press the big connect button. This is the last step, everything works on its own after that."
       },
       "balance": {
         "title": "Your Balance",

@@ -1,53 +1,94 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useFocusTrap } from '../hooks/useFocusTrap';
 
-interface OnboardingStep {
+/** Only the four values the spotlight and tooltip are positioned from. */
+const isSameRect = (a: DOMRect, b: DOMRect): boolean =>
+  a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
+
+/**
+ * How long an `awaitsUserAction` step is shown without a "Next" before one
+ * appears anyway.
+ *
+ * The escape hatch is not optional: two of those steps can dead-end. Trial
+ * activation can fail (the dashboard renders an error and no subscription is
+ * created), and "Connect Device" is disabled once the user is at their device
+ * limit, so pressing it does nothing. Without this the tooltip would offer only
+ * "Skip", which ends the tour for good — the worst possible answer for someone
+ * who just hit an error.
+ */
+const ACTION_STEP_NEXT_DELAY_MS = 10_000;
+
+export interface OnboardingStep {
   target: string; // data-onboarding attribute value
   title: string;
   description: string;
   placement: 'top' | 'bottom' | 'left' | 'right';
+  /** Route this step lives on. The runner navigates here before the step shows. */
+  route?: string;
+  /**
+   * This step asks the user to press something real, and that press is what
+   * advances the tour — activating the trial republishes the step list, and
+   * tapping through to another screen is picked up by the runner's
+   * landing detection. The tooltip hides "Next" so the tour cannot be clicked
+   * past the doing (it comes back after `ACTION_STEP_NEXT_DELAY_MS`, see above).
+   *
+   * Leave it unset on a step that has nothing to press, and on one whose control
+   * leads *off* the tour's path — a purchase page, an app store, a `happ://`
+   * link — because there pressing it must not be the only way forward.
+   */
+  awaitsUserAction?: boolean;
 }
 
 interface OnboardingProps {
   steps: OnboardingStep[];
+  /** Active step, owned by the caller so the tour survives route changes. */
+  stepIndex: number;
+  onStepChange: (index: number) => void;
   onComplete: () => void;
   onSkip: () => void;
+  /**
+   * The last step's target never appeared, so the tour ends without having been
+   * walked to the end. Distinct from `onComplete` on purpose: the caller must be
+   * able to tell "the user finished" from "we gave up".
+   */
+  onAbort: () => void;
 }
 
-const STORAGE_KEY = 'onboarding_completed';
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useOnboarding() {
-  const [isCompleted, setIsCompleted] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY) === 'true';
-  });
-
-  const complete = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, 'true');
-    setIsCompleted(true);
-  }, []);
-
-  const reset = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setIsCompleted(false);
-  }, []);
-
-  return { isCompleted, complete, reset };
-}
-
-export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProps) {
+export default function Onboarding({
+  steps,
+  stepIndex,
+  onStepChange,
+  onComplete,
+  onSkip,
+  onAbort,
+}: OnboardingProps) {
   const { t } = useTranslation();
-  const [currentStep, setCurrentStep] = useState(0);
+  const currentStep = stepIndex;
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [actionStepTimedOut, setActionStepTimedOut] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const onCompleteRef = useRef(onComplete);
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  const onStepChangeRef = useRef(onStepChange);
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  }, [onStepChange]);
+
+  const onAbortRef = useRef(onAbort);
+  useEffect(() => {
+    onAbortRef.current = onAbort;
+  }, [onAbort]);
+
+  const onSkipRef = useRef(onSkip);
+  useEffect(() => {
+    onSkipRef.current = onSkip;
+  }, [onSkip]);
 
   const step = steps[currentStep];
 
@@ -78,9 +119,11 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
         return;
       }
       if (isLastStep) {
-        onCompleteRef.current();
+        // Ran out of attempts on the final step: the user was never actually
+        // shown it, so this is an abort, not a completion.
+        onAbortRef.current();
       } else {
-        setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+        onStepChangeRef.current(Math.min(currentStep + 1, steps.length - 1));
       }
     };
 
@@ -92,34 +135,86 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.target]);
 
-  // Recalculate position on resize/scroll
+  // Recalculate position on resize/scroll, and on any relayout that moves the
+  // target.
+  //
+  // resize/scroll alone leave the cached rect stale: /connection's block list is
+  // server-driven and changes length when the user picks another platform or
+  // app, which moves the anchored block without either event firing — the
+  // spotlight then sits over whatever took over the old rect while the tooltip
+  // still describes the step. A ResizeObserver covers that without polling.
+  //
+  // It has to watch the target's *ancestors*, not just the target and <body>:
+  // switching macOS -> Linux grows <main> from 637px to 820px and pushes the
+  // anchored block down 56px while <body> stays pinned at its `min-h-viewport`
+  // floor and the block's own box never changes size at all. Observing only the
+  // target and <body> reports nothing for that half of the switch.
+  //
+  // `isVisible` is a dependency so the chain gets attached at the moment the
+  // step engine has confirmed the target is on the page — a step that navigates
+  // first would otherwise set up while its target is still unmounted.
   useEffect(() => {
-    const updatePosition = () => {
-      const target = document.querySelector(`[data-onboarding="${step.target}"]`);
-      if (target) {
-        setTargetRect(target.getBoundingClientRect());
+    const selector = `[data-onboarding="${step.target}"]`;
+    let observed: Element | null = null;
+
+    const observer = new ResizeObserver(() => updatePosition());
+
+    // Re-observe from scratch whenever the target changes identity: a relayout
+    // that swaps the block list also swaps the DOM nodes, and the old chain
+    // belongs to elements that are no longer on the page.
+    function observeChain(target: Element) {
+      observer.disconnect();
+      for (let node: Element | null = target; node; node = node.parentElement) {
+        observer.observe(node);
       }
-    };
+      observed = target;
+    }
+
+    function updatePosition() {
+      const target = document.querySelector(selector);
+      if (!target) return;
+      if (target !== observed) observeChain(target);
+      const rect = target.getBoundingClientRect();
+      // The observer can fire as a result of this component's own re-render, so
+      // commit only a rect that actually moved — otherwise the two feed back
+      // into each other.
+      setTargetRect((prev) => (prev && isSameRect(prev, rect) ? prev : rect));
+    }
+
+    updatePosition();
+    // Covers the target not being on the page yet: the step engine polls for it
+    // for ~1.3s, and <body> growing as that content mounts brings us back here
+    // to pick it up and observe its chain.
+    observer.observe(document.body);
 
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [step.target]);
+  }, [step.target, isVisible]);
+
+  // Give every step that waits on the user its own grace period: the timer is
+  // torn down and restarted whenever the step changes, by index or by identity
+  // (activating the trial rebuilds the list under a stable index).
+  useEffect(() => {
+    setActionStepTimedOut(false);
+    if (!step.awaitsUserAction) return;
+    const timer = window.setTimeout(() => setActionStepTimedOut(true), ACTION_STEP_NEXT_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentStep, step.target, step.awaitsUserAction]);
+
+  // An action step hides "Next" so the only way on is doing the thing — until
+  // the grace period above expires and hands the user a way out regardless.
+  const showNext = !step.awaitsUserAction || actionStepTimedOut;
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      onStepChange(currentStep + 1);
     } else {
       onComplete();
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
     }
   };
 
@@ -127,16 +222,36 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
     onSkip();
   };
 
-  // Trap focus inside the tooltip while the tour runs; Esc skips it.
-  // lockScroll stays off so scrollIntoView can bring each target into view.
-  const trapRef = useFocusTrap<HTMLDivElement>(true, { onEscape: handleSkip, lockScroll: false });
-  const setTooltipNode = useCallback(
-    (node: HTMLDivElement | null) => {
-      tooltipRef.current = node;
-      trapRef.current = node;
-    },
-    [trapRef],
-  );
+  // The tour is deliberately non-modal: the highlighted control stays live so
+  // "press this button" steps can actually be pressed. That rules out a focus
+  // trap (it would make the control unreachable by keyboard), so Escape is
+  // wired up directly instead of through useFocusTrap's onEscape.
+  //
+  // Registered in the capture phase and stopped immediately, so that while the
+  // tour is up Escape is the tour's and nothing else's. /connection also closes
+  // itself on Escape; it guards on `isRunning`, but a bubble-phase listener here
+  // clears that flag before the guard ever reads it, so Escape both dismissed
+  // the tour and threw the user back to `/`. A capture-phase document listener
+  // always precedes bubble-phase document listeners, so this no longer depends
+  // on which component happened to mount — and register — first.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onSkipRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, []);
+
+  // Park focus on the tooltip as each step appears, so a screen reader announces
+  // the explanation and Tab continues from here into the page — onto the
+  // highlighted control — rather than cycling inside the tooltip.
+  useEffect(() => {
+    if (!isVisible) return;
+    tooltipRef.current?.focus({ preventScroll: true });
+  }, [isVisible, currentStep]);
 
   // Calculate tooltip position
   const getTooltipStyle = (): React.CSSProperties => {
@@ -207,24 +322,23 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
   return createPortal(
     <div className="onboarding-overlay" style={{ opacity: isVisible ? 1 : 0 }}>
       {/* Spotlight */}
-      <div
-        className="onboarding-spotlight"
-        style={{
-          ...getSpotlightStyle(),
-          pointerEvents: isVisible ? 'auto' : 'none',
-        }}
-      />
+      <div className="onboarding-spotlight" style={getSpotlightStyle()} />
 
       {/* Tooltip */}
       <div
-        ref={setTooltipNode}
+        ref={tooltipRef}
         role="dialog"
-        aria-modal="true"
+        // No aria-modal: the rest of the UI stays interactive on purpose, and
+        // claiming modality would hide the highlighted control from AT.
         aria-labelledby="onboarding-title"
         aria-describedby="onboarding-desc"
+        tabIndex={-1}
         className={`onboarding-tooltip tooltip-${step.placement}`}
         style={{
           ...getTooltipStyle(),
+          // Not redundant with the stylesheet's `pointer-events-auto`: the
+          // 'none' branch is the point — it keeps the faded-out tooltip from
+          // swallowing clicks while a step transitions.
           pointerEvents: isVisible ? 'auto' : 'none',
         }}
       >
@@ -262,34 +376,16 @@ export default function Onboarding({ steps, onComplete, onSkip }: OnboardingProp
           </button>
 
           <div className="flex gap-2">
-            {currentStep > 0 && (
-              <button onClick={handlePrev} className="btn-ghost px-3 py-1.5 text-sm">
-                {t('common.back', 'Back')}
+            {showNext && (
+              <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
+                {currentStep === steps.length - 1
+                  ? t('onboarding.finish', 'Finish')
+                  : t('common.next', 'Next')}
               </button>
             )}
-            <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
-              {currentStep === steps.length - 1
-                ? t('onboarding.finish', 'Finish')
-                : t('common.next', 'Next')}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Click handler to advance on target click — only when overlay is fully visible */}
-      {targetRect && isVisible && (
-        <div
-          aria-hidden="true"
-          className="absolute cursor-pointer"
-          style={{
-            top: targetRect.top,
-            left: targetRect.left,
-            width: targetRect.width,
-            height: targetRect.height,
-          }}
-          onClick={handleNext}
-        />
-      )}
     </div>,
     document.body,
   );
