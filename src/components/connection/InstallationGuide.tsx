@@ -49,6 +49,7 @@ interface Props {
   isTelegramWebApp: boolean;
   onGoBack: () => void;
   onOpenQR?: () => void;
+  username?: string;
 }
 
 export default function InstallationGuide({
@@ -57,6 +58,7 @@ export default function InstallationGuide({
   isTelegramWebApp,
   onGoBack,
   onOpenQR,
+  username,
 }: Props) {
   const { t, i18n } = useTranslation();
   const { isLight } = useTheme();
@@ -132,6 +134,7 @@ export default function InstallationGuide({
         subscriptionUrl={appConfig.subscriptionUrl}
         hideLink={appConfig.hideLink}
         deepLink={selectedApp?.deepLink}
+        username={username}
         getLocalizedText={getLocalizedText}
         getBaseTranslation={getBaseTranslation}
         getSvgHtml={getSvgHtml}
@@ -142,6 +145,7 @@ export default function InstallationGuide({
       appConfig.subscriptionUrl,
       appConfig.hideLink,
       selectedApp?.deepLink,
+      username,
       isLight,
       getLocalizedText,
       getBaseTranslation,
