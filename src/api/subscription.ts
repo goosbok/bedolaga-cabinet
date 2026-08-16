@@ -1,4 +1,4 @@
-import apiClient from './client';
+import apiClient, { isNotFound } from './client';
 import { getYandexCid } from '../utils/yandexCid';
 import type {
   Subscription,
@@ -353,12 +353,21 @@ export const subscriptionApi = {
 
   // ── SBP recurring (Platega) ───────────────────────────────────────────
 
+  // A bot without the auto-payment endpoints is the same thing as a subscription
+  // with no auto-payment set up: status 'none'. Letting the 404 reject instead
+  // put two failing requests and a retry on the subscription screen — the busiest
+  // page in the cabinet — for a feature the backend simply does not carry yet.
   getSbpRecurring: async (subscriptionId?: number): Promise<SbpRecurringInfo> => {
-    const response = await apiClient.get<SbpRecurringInfo>(
-      '/cabinet/subscription/platega-recurrent',
-      withSubId(subscriptionId),
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<SbpRecurringInfo>(
+        '/cabinet/subscription/platega-recurrent',
+        withSubId(subscriptionId),
+      );
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return { status: 'none' };
+      throw error;
+    }
   },
 
   enableSbpRecurring: async (
@@ -398,11 +407,16 @@ export const subscriptionApi = {
   // ── Recurring (Lava) ──────────────────────────────────────────────────
 
   getLavaRecurring: async (subscriptionId?: number): Promise<LavaRecurringInfo> => {
-    const response = await apiClient.get<LavaRecurringInfo>(
-      '/cabinet/subscription/lava-recurrent',
-      withSubId(subscriptionId),
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<LavaRecurringInfo>(
+        '/cabinet/subscription/lava-recurrent',
+        withSubId(subscriptionId),
+      );
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return { status: 'none' };
+      throw error;
+    }
   },
 
   enableLavaRecurring: async (

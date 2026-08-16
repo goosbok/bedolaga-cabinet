@@ -20,6 +20,9 @@ const BOT_ENTRY_ROUTES = new Set([
   '/profile',
 ]);
 
+/** `?tour=1` on any cabinet URL replays the tour from the first step. */
+const TOUR_RESET_PARAM = 'tour';
+
 /** One nudge per webview session, so reopening the app cannot loop the user. */
 const ENTRY_NUDGE_KEY = '__onboarding_entry_nudge';
 
@@ -83,7 +86,25 @@ export default function OnboardingRunner() {
   // Entry only, and only from the menu's own destinations: someone who opens
   // /balance later in the session, or lands on a payment result, is left alone.
   const entryPathRef = useRef(location.pathname);
+  const entrySearchRef = useRef(location.search);
   useEffect(() => {
+    // `?tour=1` replays the tour for someone who already finished or skipped it.
+    // Completion is remembered by this browser, not by the account, so there is
+    // nothing to switch on server-side — this link is the way back in, for
+    // testing and for support telling a user "open this to see the guide again".
+    const params = new URLSearchParams(entrySearchRef.current);
+    if (params.get(TOUR_RESET_PARAM) === '1') {
+      useOnboardingStore.getState().reset();
+      // Drop the parameter so a refresh or a shared link does not restart the
+      // tour a second time, and so it never leaks into a bookmark.
+      params.delete(TOUR_RESET_PARAM);
+      const search = params.toString();
+      navigateRef.current(`${entryPathRef.current}${search ? `?${search}` : ''}`, {
+        replace: true,
+      });
+      return;
+    }
+
     if (useOnboardingStore.getState().hasStarted) return;
     if (isOnboardingDismissed()) return;
     if (!BOT_ENTRY_ROUTES.has(entryPathRef.current)) return;

@@ -11,6 +11,7 @@ import { balanceApi } from '../api/balance';
 import { wheelApi } from '../api/wheel';
 import type { OnboardingStep } from '../components/Onboarding';
 import { useOnboardingStore } from '../store/onboarding';
+import { pickTourSubscription } from './dashboardTour';
 import PromoOffersSection from '../components/PromoOffersSection';
 import NewsSection from '../components/news/NewsSection';
 import SubscriptionCardActive from '../components/dashboard/SubscriptionCardActive';
@@ -212,10 +213,14 @@ export default function Dashboard() {
   // anchor is missing costs the user a blank overlay and is then dropped, so
   // the step list must never outrun what is on screen.
 
-  // The subscription the tour walks through. In multi-tariff mode `subscription`
-  // is null, so fall back to the first one in the list — the same card that
-  // carries the `dashboard-subscription` anchor.
-  const tourSubscription = subscription ?? multiSubData?.subscriptions?.[0] ?? null;
+  // The subscription the tour walks through — always the one carrying the
+  // `dashboard-subscription` anchor, so the step routes and the highlighted card
+  // cannot drift apart. See pickTourSubscription for what went wrong when they did.
+  const tourSubscription = pickTourSubscription(
+    isMultiTariff,
+    subscription,
+    multiSubData?.subscriptions,
+  );
   const tourSubscriptionId = tourSubscription?.id ?? null;
 
   // `dashboard-subscription` sits on the first SubscriptionListCard in

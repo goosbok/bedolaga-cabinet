@@ -227,6 +227,30 @@ describe('useOnboardingStore', () => {
       expect(isOnboardingDismissed()).toBe(false);
     });
 
+    it('reset() lets a finished tour run again', () => {
+      const s = useOnboardingStore.getState();
+      s.start(shortTour);
+      s.skip();
+      expect(isOnboardingDismissed()).toBe(true);
+
+      useOnboardingStore.getState().reset();
+
+      expect(isOnboardingDismissed()).toBe(false);
+      expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
+      // hasStarted has to fall too, or start() refuses on the guard instead.
+      expect(useOnboardingStore.getState().hasStarted).toBe(false);
+
+      useOnboardingStore.getState().start(fullTour);
+      expect(useOnboardingStore.getState().isRunning).toBe(true);
+      expect(useOnboardingStore.getState().stepIndex).toBe(0);
+    });
+
+    it('reset() is harmless when the tour was never run', () => {
+      useOnboardingStore.getState().reset();
+      expect(isOnboardingDismissed()).toBe(false);
+      expect(useOnboardingStore.getState().isRunning).toBe(false);
+    });
+
     it('agrees with start(): dismissed means start is a no-op', () => {
       useOnboardingStore.getState().start(shortTour);
       useOnboardingStore.getState().skip();

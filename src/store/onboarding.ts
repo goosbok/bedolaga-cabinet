@@ -14,6 +14,11 @@ const writeFlag = (): void => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
 };
 
+const clearFlag = (): void => {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+};
+
 /**
  * Whether the user is done with the tour for good — same check `start` makes.
  *
@@ -83,6 +88,14 @@ interface OnboardingState {
   goTo: (index: number) => void;
   /** Explicit opt-out: never show the tour again. */
   skip: () => void;
+  /**
+   * Forgets that the tour was ever finished or skipped, so it runs again.
+   *
+   * Completion lives in this browser's storage, not on the account — there is
+   * no server-side switch to flip. Support and testing need a way back in
+   * without walking someone through devtools, which is what `?tour=1` calls.
+   */
+  reset: () => void;
   /** Reached the end of the list; persists only per `shouldPersistCompletion`. */
   complete: () => void;
   /**
@@ -134,6 +147,11 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   skip: () => {
     writeFlag();
     set({ isRunning: false });
+  },
+
+  reset: () => {
+    clearFlag();
+    set({ steps: [], stepIndex: 0, isRunning: false, hasStarted: false });
   },
 
   complete: () => {
