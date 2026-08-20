@@ -107,7 +107,12 @@ export default function Onboarding({
       if (target) {
         const rect = target.getBoundingClientRect();
         setTargetRect(rect);
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Centring a tall card leaves no room either side of it on a phone, and
+        // the tooltip then has nowhere to go but on top of the control the step
+        // is telling the user to press. Pinning such a target to the top keeps
+        // its lower half — where the action button lives — clear of the tooltip.
+        const isTall = rect.height > window.innerHeight * 0.5;
+        target.scrollIntoView({ behavior: 'smooth', block: isTall ? 'start' : 'center' });
         window.setTimeout(() => {
           if (!cancelled) setIsVisible(true);
         }, 100);
@@ -294,6 +299,23 @@ export default function Onboarding({
     if (top < padding) top = padding;
     if (top + tooltipHeight > viewportHeight - padding) {
       top = viewportHeight - tooltipHeight - padding;
+    }
+
+    // Never sit on top of the thing being pointed at. Clamping to the viewport
+    // above can drop the tooltip squarely over the target on a short screen,
+    // which is fatal for an action step: the button the text names is then
+    // underneath the text naming it. Reported from a phone, where the tooltip
+    // covered "Активировать бесплатно" on the trial card.
+    const gap = 12;
+    const overlapsTarget =
+      top < targetRect.bottom + gap && top + tooltipHeight > targetRect.top - gap;
+    if (overlapsTarget) {
+      const roomBelow = viewportHeight - targetRect.bottom - padding;
+      const roomAbove = targetRect.top - padding;
+      top =
+        roomBelow >= roomAbove
+          ? Math.min(targetRect.bottom + gap, viewportHeight - tooltipHeight - padding)
+          : Math.max(padding, targetRect.top - tooltipHeight - gap);
     }
 
     return {
