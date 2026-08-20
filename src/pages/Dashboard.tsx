@@ -382,11 +382,34 @@ export default function Dashboard() {
 
   // Start once the data the step list depends on has settled. The store ignores
   // repeat calls, so re-publishing a changed list never rewinds the tour.
+  //
+  // The delay is scheduled exactly once, and the steps are read from a ref when
+  // it fires. Listing `onboardingSteps` as a dependency instead meant every
+  // republished list tore the pending timer down and started a new one — and the
+  // list is republished by each query that lands (trial info, subscriptions,
+  // referral, balance). A new account resolves all of them within a few hundred
+  // milliseconds of each other, so on a fast connection the 500ms could keep
+  // being pushed back and the tour never started at all. Nothing about that is
+  // visible in an error; the dashboard simply renders without an overlay.
+  const onboardingStepsRef = useRef(onboardingSteps);
+  onboardingStepsRef.current = onboardingSteps;
+  const startTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (startTimerRef.current !== null) window.clearTimeout(startTimerRef.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (subLoading || refLoading || blockingType) return;
-    const timer = setTimeout(() => startOnboarding(onboardingSteps), 500);
-    return () => clearTimeout(timer);
-  }, [subLoading, refLoading, blockingType, startOnboarding, onboardingSteps]);
+    if (startTimerRef.current !== null) return;
+    startTimerRef.current = window.setTimeout(
+      () => startOnboarding(onboardingStepsRef.current),
+      500,
+    );
+  }, [subLoading, refLoading, blockingType, startOnboarding]);
 
   // Keep a running tour in sync: activating the trial creates a subscription,
   // which unlocks the connect and installation steps without a reload.
