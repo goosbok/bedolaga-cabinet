@@ -223,10 +223,6 @@ export default function Onboarding({
     }
   };
 
-  const handleSkip = () => {
-    onSkip();
-  };
-
   // The tour is deliberately non-modal: the highlighted control stays live so
   // "press this button" steps can actually be pressed. That rules out a focus
   // trap (it would make the control unreachable by keyboard), so Escape is
@@ -388,15 +384,11 @@ export default function Onboarding({
           {step.description}
         </p>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleSkip}
-            className="text-sm text-dark-500 transition-colors hover:text-dark-300"
-          >
-            {t('onboarding.skip', 'Skip')}
-          </button>
-
+        {/* Actions. No visible "skip": the tour is short and only ever shown to
+            someone who has not connected yet, so the product choice is to keep
+            guiding rather than offer an exit on every step. Escape still ends it
+            for keyboard users. */}
+        <div className="flex items-center justify-end">
           <div className="flex gap-2">
             {showNext && (
               <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
