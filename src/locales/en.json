@@ -5119,8 +5119,8 @@
         "description": "This is your subscription key. The button on the right copies it: opened in a browser it shows the connection guide, and the same link can be shared with family and friends."
       },
       "subConnectDevice": {
-        "title": "Add a Device",
-        "description": "This is where you add a new device. The counter next to it shows how many of the devices you are allowed are already connected."
+        "title": "One step left — install the app",
+        "description": "Tap \"Connect Device\" to open the page with the app for your phone or computer and step-by-step setup. The counter next to it shows how many devices are already connected."
       },
       "subUpgrade": {
         "title": "Choose a Plan",
