@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+
+import { computeBlockerRects } from './onboardingBlockers';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -323,6 +325,14 @@ export default function Onboarding({
     };
   };
 
+  // The frame is computed by computeBlockerRects, which is tested directly:
+  // getting the hole wrong would make the control a step names unpressable, and
+  // that is a worse failure than the stray taps this shield exists to stop.
+  //
+  // Only click is intercepted, deliberately — touch scrolling still reaches the
+  // page, so a user is never stuck on a screen they cannot move.
+  const blockerRects = isVisible ? computeBlockerRects(targetRect) : [];
+
   // Spotlight style
   const getSpotlightStyle = (): React.CSSProperties => {
     if (!targetRect) return { opacity: 0 };
@@ -339,6 +349,19 @@ export default function Onboarding({
 
   return createPortal(
     <div className="onboarding-overlay" style={{ opacity: isVisible ? 1 : 0 }}>
+      {/* Click shield: everything except the highlighted control */}
+      {blockerRects.map((rect, i) => (
+        <div
+          key={i}
+          className="onboarding-blocker"
+          style={rect}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        />
+      ))}
+
       {/* Spotlight */}
       <div className="onboarding-spotlight" style={getSpotlightStyle()} />
 

@@ -1520,9 +1520,13 @@ input[type="checkbox"]:hover:not(:checked) {
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* pointer-events: none is load-bearing — clicks must reach the real control
-   underneath, otherwise action steps ("press Activate Free") cannot be
-   completed. The tour is deliberately soft: nothing is click-blocked. */
+/* The blocker frame carries pointer-events; the spotlight rectangle is left
+   uncovered so clicks still reach the real control underneath — without that an
+   action step ("press Activate Free") could not be completed at all. */
+.onboarding-blocker {
+  @apply pointer-events-auto absolute;
+}
+
 .onboarding-spotlight {
   @apply pointer-events-none absolute;
   border-radius: 16px;
