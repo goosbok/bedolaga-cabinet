@@ -220,6 +220,8 @@ export function AppHeader({
                   {appName}
                 </span>
               )}
+              {/* Platega verification codeword — remove after kassa approval */}
+              <span className="whitespace-nowrap text-[10px] text-dark-600">чекап</span>
             </Link>
 
             {/* Right side */}

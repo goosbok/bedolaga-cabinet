@@ -229,6 +229,8 @@ export function AppShell({ children }: AppShellProps) {
               )}
             </div>
             <span className="text-base font-semibold text-dark-100">{appName}</span>
+            {/* Platega verification codeword — remove after kassa approval */}
+            <span className="text-[10px] text-dark-600">чекап</span>
           </Link>
 
           {/* Navigation — единая «капсула» (segmented control): все пункты видны
