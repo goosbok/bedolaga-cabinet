@@ -5128,7 +5128,7 @@
       },
       "installApp": {
         "title": "Install the App",
-        "description": "We already know which device you are on. Press the button to install the right app. If the App Store says it is unavailable in your region, there is a button next to it with a guide."
+        "description": "We already know which device you are on. Press the button to install the right app."
       },
       "addSubscription": {
         "title": "Add Your Subscription",
