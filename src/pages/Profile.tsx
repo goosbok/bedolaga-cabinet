@@ -20,6 +20,7 @@ import { referralApi } from '../api/referral';
 import { brandingApi, type EmailAuthEnabled } from '../api/branding';
 import { UI } from '../config/constants';
 import { Card } from '@/components/data-display/Card';
+import LegalFooter from '@/components/LegalFooter';
 import { Button } from '@/components/primitives/Button';
 import { Switch } from '@/components/primitives/Switch';
 import { staggerContainer, staggerItem } from '@/components/motion/transitions';
@@ -758,6 +759,19 @@ export default function Profile() {
           ) : (
             <p className="text-dark-400">{t('profile.notifications.unavailable')}</p>
           )}
+        </Card>
+      </motion.div>
+
+      {/* Legal documents */}
+      <motion.div variants={staggerItem}>
+        <Card>
+          <h2 className="mb-4 text-lg font-semibold text-dark-100">
+            {t('profile.legal.title', 'Документы')}
+          </h2>
+          <p className="mb-4 text-sm text-dark-400">
+            {t('profile.legal.desc', 'Публичная оферта и политика конфиденциальности сервиса.')}
+          </p>
+          <LegalFooter className="justify-start text-left" />
         </Card>
       </motion.div>
     </motion.div>
