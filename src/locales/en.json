@@ -474,7 +474,7 @@
     },
     "trialUpgrade": {
       "title": "Choose a plan to continue",
-      "description": "Your trial period is ending soon. Select a plan to continue using VPN without restrictions."
+      "description": "Your trial period is ending soon. Select a plan to continue using VPN."
     },
     "expiredBanner": {
       "title": "Subscription expired",
