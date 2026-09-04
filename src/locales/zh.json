@@ -2653,7 +2653,9 @@
       "approveDialog": {
         "title": "批准申请",
         "description": "批准来自 {{name}} 的合作伙伴申请",
-        "commissionLabel": "佣金（%）"
+        "commissionLabel": "佣金（%）",
+        "maxPaymentsLabel": "多少次付款产生佣金",
+        "maxPaymentsHint": "0 — 被邀请用户的每次付款都产生佣金。其他数字 — 仅前若干次付款产生佣金。"
       },
       "rejectDialog": {
         "title": "拒绝申请",
@@ -2709,7 +2711,9 @@
       },
       "commission": {
         "title": "佣金",
-        "update": "更新"
+        "update": "更新",
+        "paymentsTitle": "计佣付款次数",
+        "unlimited": "全部"
       },
       "campaigns": {
         "title": "分配的活动",
@@ -2736,7 +2740,9 @@
       "commissionDialog": {
         "title": "更新佣金",
         "description": "为该合作伙伴设置新的佣金百分比。",
-        "label": "佣金（%）"
+        "label": "佣金（%）",
+        "maxPaymentsLabel": "多少次付款产生佣金",
+        "maxPaymentsHint": "0 — 被邀请用户的每次付款都产生佣金。其他数字 — 仅前若干次付款产生佣金。"
       },
       "revokeDialog": {
         "title": "撤销合作伙伴身份？",

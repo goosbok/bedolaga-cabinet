@@ -132,6 +132,7 @@ export interface AdminPartnerItem {
   first_name: string | null;
   telegram_id: number | null;
   commission_percent: number | null;
+  max_commission_payments: number | null;
   total_referrals: number;
   total_earnings_kopeks: number;
   balance_kopeks: number;
@@ -150,6 +151,7 @@ export interface AdminPartnerDetailResponse {
   first_name: string | null;
   telegram_id: number | null;
   commission_percent: number | null;
+  max_commission_payments: number | null;
   partner_status: string;
   balance_kopeks: number;
   total_referrals: number;
@@ -241,7 +243,7 @@ export const partnerApi = {
 
   approveApplication: async (
     applicationId: number,
-    data: { commission_percent: number; comment?: string },
+    data: { commission_percent: number; max_commission_payments?: number; comment?: string },
   ): Promise<void> => {
     await apiClient.post(`/cabinet/admin/partners/applications/${applicationId}/approve`, data);
   },
@@ -267,9 +269,14 @@ export const partnerApi = {
     return response.data;
   },
 
-  updateCommission: async (userId: number, commissionPercent: number): Promise<void> => {
+  updateCommission: async (
+    userId: number,
+    commissionPercent: number,
+    maxCommissionPayments?: number,
+  ): Promise<void> => {
     await apiClient.patch(`/cabinet/admin/partners/${userId}/commission`, {
       commission_percent: commissionPercent,
+      max_commission_payments: maxCommissionPayments,
     });
   },
 

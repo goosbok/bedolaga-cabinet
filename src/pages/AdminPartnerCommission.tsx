@@ -13,8 +13,12 @@ export default function AdminPartnerCommission() {
   const queryClient = useQueryClient();
 
   // Try to get current commission from navigate state
-  const passedCommission = (location.state as { currentCommission?: number } | null)
-    ?.currentCommission;
+  const passedState = location.state as {
+    currentCommission?: number;
+    currentMaxPayments?: number;
+  } | null;
+  const passedCommission = passedState?.currentCommission;
+  const passedMaxPayments = passedState?.currentMaxPayments;
 
   const { data: partner } = useQuery({
     queryKey: ['admin-partner-detail', userId],
@@ -23,7 +27,9 @@ export default function AdminPartnerCommission() {
   });
 
   const currentCommission = passedCommission ?? partner?.commission_percent ?? 0;
+  const currentMaxPayments = passedMaxPayments ?? partner?.max_commission_payments ?? 0;
   const [commissionValue, setCommissionValue] = useState(String(currentCommission));
+  const [maxPaymentsValue, setMaxPaymentsValue] = useState(String(currentMaxPayments));
 
   // Sync commission value when data loads asynchronously
   useEffect(() => {
@@ -32,8 +38,15 @@ export default function AdminPartnerCommission() {
     }
   }, [partner?.commission_percent, passedCommission]);
 
+  useEffect(() => {
+    if (partner?.max_commission_payments != null && passedMaxPayments === undefined) {
+      setMaxPaymentsValue(String(partner.max_commission_payments));
+    }
+  }, [partner?.max_commission_payments, passedMaxPayments]);
+
   const updateMutation = useMutation({
-    mutationFn: (commission: number) => partnerApi.updateCommission(Number(userId), commission),
+    mutationFn: ({ commission, maxPayments }: { commission: number; maxPayments: number }) =>
+      partnerApi.updateCommission(Number(userId), commission, maxPayments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-partner-detail', userId] });
       queryClient.invalidateQueries({ queryKey: ['admin-partners'] });
@@ -57,7 +70,11 @@ export default function AdminPartnerCommission() {
         </p>
 
         <div className="mb-2 text-sm text-dark-500">
-          {t('admin.partnerDetail.commission.title')}: {currentCommission}%
+          {t('admin.partnerDetail.commission.title')}: {currentCommission}%{' · '}
+          {t('admin.partnerDetail.commission.paymentsTitle')}:{' '}
+          {currentMaxPayments === 0
+            ? t('admin.partnerDetail.commission.unlimited')
+            : currentMaxPayments}
         </div>
 
         <label className="mb-1 block text-sm font-medium text-dark-300">
@@ -69,8 +86,23 @@ export default function AdminPartnerCommission() {
           max="100"
           value={commissionValue}
           onChange={(e) => setCommissionValue(e.target.value)}
-          className="mb-6 w-full rounded-lg border border-dark-600 bg-dark-700 px-3 py-2 text-dark-100 outline-none focus:border-accent-500"
+          className="mb-4 w-full rounded-lg border border-dark-600 bg-dark-700 px-3 py-2 text-dark-100 outline-none focus:border-accent-500"
         />
+
+        <label className="mb-1 block text-sm font-medium text-dark-300">
+          {t('admin.partnerDetail.commissionDialog.maxPaymentsLabel')}
+        </label>
+        <input
+          type="number"
+          min="0"
+          max="1000"
+          value={maxPaymentsValue}
+          onChange={(e) => setMaxPaymentsValue(e.target.value)}
+          className="mb-1 w-full rounded-lg border border-dark-600 bg-dark-700 px-3 py-2 text-dark-100 outline-none focus:border-accent-500"
+        />
+        <p className="mb-6 text-xs text-dark-500">
+          {t('admin.partnerDetail.commissionDialog.maxPaymentsHint')}
+        </p>
 
         <div className="flex gap-3">
           <button
@@ -82,13 +114,18 @@ export default function AdminPartnerCommission() {
           <button
             onClick={() => {
               const val = Number(commissionValue);
-              if (val >= 1 && val <= 100) updateMutation.mutate(val);
+              const payments = Number(maxPaymentsValue);
+              if (val >= 1 && val <= 100 && payments >= 0) {
+                updateMutation.mutate({ commission: val, maxPayments: payments });
+              }
             }}
             disabled={
               updateMutation.isPending ||
               !commissionValue ||
               Number(commissionValue) < 1 ||
-              Number(commissionValue) > 100
+              Number(commissionValue) > 100 ||
+              maxPaymentsValue === '' ||
+              Number(maxPaymentsValue) < 0
             }
             className="flex-1 rounded-lg bg-accent-500 px-4 py-3 font-medium text-on-accent transition-colors hover:bg-accent-600 disabled:opacity-50"
           >

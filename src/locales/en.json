@@ -3052,7 +3052,9 @@
       "approveDialog": {
         "title": "Approve Application",
         "description": "Approve partner application from {{name}}",
-        "commissionLabel": "Commission (%)"
+        "commissionLabel": "Commission (%)",
+        "maxPaymentsLabel": "How many payments earn commission",
+        "maxPaymentsHint": "0 — commission from every payment an invited user makes. Any other number — only from that many first payments of each invited user."
       },
       "rejectDialog": {
         "title": "Reject Application",
@@ -3108,7 +3110,9 @@
       },
       "commission": {
         "title": "Commission",
-        "update": "Update"
+        "update": "Update",
+        "paymentsTitle": "Payments with commission",
+        "unlimited": "all"
       },
       "campaigns": {
         "title": "Assigned Campaigns",
@@ -3135,7 +3139,9 @@
       "commissionDialog": {
         "title": "Update Commission",
         "description": "Set a new commission percentage for this partner.",
-        "label": "Commission (%)"
+        "label": "Commission (%)",
+        "maxPaymentsLabel": "How many payments earn commission",
+        "maxPaymentsHint": "0 — commission from every payment an invited user makes. Any other number — only from that many first payments of each invited user."
       },
       "revokeDialog": {
         "title": "Revoke Partner Status?",
