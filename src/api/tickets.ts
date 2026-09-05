@@ -79,10 +79,11 @@ export const ticketsApi = {
     return response.data;
   },
 
-  // Get media URL for display. The signed `token` comes from the ticket
-  // response and is required by the backend (a raw file_id alone 404s).
+  // Get media URL for display. Same base as apiClient: the browser loads this
+  // straight into <img>/<video>, so a URL without the /api prefix is answered by
+  // the SPA catch-all with index.html instead of the file.
   getMediaUrl: (fileId: string, token?: string | null): string => {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
     const suffix = token ? `?token=${encodeURIComponent(token)}` : '';
     return `${baseUrl}/cabinet/media/${fileId}${suffix}`;
   },
