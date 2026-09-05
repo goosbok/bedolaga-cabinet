@@ -126,9 +126,15 @@ export const preloadLogo = async (branding: BrandingInfo): Promise<void> => {
   }
 
   try {
-    const logoUrl = `${import.meta.env.VITE_API_URL || ''}${branding.logo_url}`;
+    // Same base as apiClient. Without the /api prefix the request lands on the
+    // SPA catch-all, which answers `200 text/html` with index.html.
+    const logoUrl = `${import.meta.env.VITE_API_URL || '/api'}${branding.logo_url}`;
     const response = await fetch(logoUrl);
     if (!response.ok) return;
+
+    // `ok` alone is not enough: a page served in place of the file would become
+    // a blob URL and render as a broken logo. Fall through to the letter instead.
+    if (!response.headers.get('content-type')?.startsWith('image/')) return;
 
     const blob = await response.blob();
     // Revoke previous blob URL if exists
