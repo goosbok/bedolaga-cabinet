@@ -141,10 +141,11 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   start: (steps) => {
     if (get().hasStarted) return;
     const force = get().forceNextStart;
+    if (force) set({ forceNextStart: false });
     if (!force && readFlag()) return;
     if (!force && get().hasEverConnected) return;
     if (!steps.length) return;
-    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true, forceNextStart: false });
+    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true });
   },
 
   setSteps: (steps) => {

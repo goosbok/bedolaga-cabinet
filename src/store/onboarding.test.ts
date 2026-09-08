@@ -121,6 +121,17 @@ describe('useOnboardingStore', () => {
     expect(useOnboardingStore.getState().isRunning).toBe(false);
   });
 
+  it('consumes forceNextStart even when start() bails on an empty step list', () => {
+    const s = useOnboardingStore.getState();
+    s.reset();
+    s.start([]);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+    s.setHasEverConnected(true);
+    // The override from reset() must not still be armed for this unrelated start.
+    s.start(fullTour);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+  });
+
   it('does not rewind a running tour when start is called again', () => {
     const s = useOnboardingStore.getState();
     s.start(fullTour);
