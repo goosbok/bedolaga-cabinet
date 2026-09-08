@@ -52,7 +52,7 @@ export default function Dashboard() {
   });
 
   // Multi-tariff: check if user has multiple subscriptions
-  const { data: multiSubData } = useQuery({
+  const { data: multiSubData, isLoading: multiSubLoading } = useQuery({
     queryKey: ['subscriptions-list'],
     queryFn: () => subscriptionApi.getSubscriptions(),
     staleTime: 60_000,
@@ -403,13 +403,17 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
-    if (subLoading || refLoading || blockingType) return;
+    // multiSubLoading matters here too: in multi-tariff mode hasEverConnected
+    // (read by the store's start()) comes from multiSubData, and subLoading
+    // alone doesn't cover it — that query is disabled entirely in multi-tariff
+    // mode. Without this, start() could fire before hasEverConnected settled.
+    if (subLoading || multiSubLoading || refLoading || blockingType) return;
     if (startTimerRef.current !== null) return;
     startTimerRef.current = window.setTimeout(
       () => startOnboarding(onboardingStepsRef.current),
       500,
     );
-  }, [subLoading, refLoading, blockingType, startOnboarding]);
+  }, [subLoading, multiSubLoading, refLoading, blockingType, startOnboarding]);
 
   // Keep a running tour in sync: activating the trial creates a subscription,
   // which unlocks the connect and installation steps without a reload.
