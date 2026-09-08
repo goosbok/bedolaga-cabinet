@@ -43,6 +43,7 @@ beforeEach(() => {
     isRunning: false,
     hasStarted: false,
     hasEverConnected: false,
+    forceNextStart: false,
   });
 });
 
@@ -90,6 +91,33 @@ describe('useOnboardingStore', () => {
 
   it('does not start with an empty step list', () => {
     useOnboardingStore.getState().start([]);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+  });
+
+  it('does not start when the user already has a live connection', () => {
+    const s = useOnboardingStore.getState();
+    s.setHasEverConnected(true);
+    s.start(fullTour);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+  });
+
+  it('reset() forces the next start even for a connected user — the ?tour=1 override', () => {
+    const s = useOnboardingStore.getState();
+    s.setHasEverConnected(true);
+    s.reset();
+    s.start(fullTour);
+    expect(useOnboardingStore.getState().isRunning).toBe(true);
+  });
+
+  it('the reset() override is consumed by that one start and does not linger', () => {
+    const s = useOnboardingStore.getState();
+    s.reset();
+    s.start(shortTour);
+    s.complete();
+    useOnboardingStore.setState({ hasStarted: false, isRunning: false, steps: [] });
+    s.setHasEverConnected(true);
+    s.start(fullTour);
+    // Second start is a normal one — the override from reset() was one-shot.
     expect(useOnboardingStore.getState().isRunning).toBe(false);
   });
 
@@ -143,6 +171,7 @@ describe('useOnboardingStore', () => {
   it('complete sets the flag when the user finished on the connect step and has connected', () => {
     const s = useOnboardingStore.getState();
     s.setHasEverConnected(true);
+    s.reset();
     s.start(fullTour);
     s.next();
     s.next();
@@ -233,6 +262,7 @@ describe('useOnboardingStore', () => {
       const s = useOnboardingStore.getState();
       // Only a real completion persists the flag now — skip() no longer does.
       s.setHasEverConnected(true);
+      s.reset();
       s.start(fullTour);
       s.next();
       s.next();
@@ -260,6 +290,7 @@ describe('useOnboardingStore', () => {
     it('agrees with start(): dismissed means start is a no-op', () => {
       const s = useOnboardingStore.getState();
       s.setHasEverConnected(true);
+      s.reset();
       s.start(fullTour);
       s.next();
       s.next();
@@ -271,6 +302,7 @@ describe('useOnboardingStore', () => {
         // Isolate the persisted-flag path from a separate hasEverConnected
         // gate added by a later task — this test is specifically about the flag.
         hasEverConnected: false,
+        forceNextStart: false,
       });
 
       expect(isOnboardingDismissed()).toBe(true);

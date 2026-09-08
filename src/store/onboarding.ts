@@ -70,11 +70,23 @@ interface OnboardingState {
   hasStarted: boolean;
   /**
    * Whether any of the user's subscriptions has ever carried traffic. Published
-   * by Dashboard alongside the step list; gates `complete()`.
+   * by Dashboard alongside the step list; gates `complete()` and, below,
+   * `start()` itself.
    */
   hasEverConnected: boolean;
+  /**
+   * One-shot override set by `reset()`. Consumed by the very next `start()`
+   * call to skip both the persisted-flag check and the `hasEverConnected`
+   * check — otherwise the `?tour=1` support link would silently do nothing
+   * for exactly the connected users it exists to reach.
+   */
+  forceNextStart: boolean;
 
-  /** Begins the tour unless it was already completed or there is nothing to show. */
+  /**
+   * Begins the tour unless it was already completed, the user is already
+   * connected, or there is nothing to show — unless `reset()` just asked for
+   * it anyway via `forceNextStart`.
+   */
   start: (steps: OnboardingStep[]) => void;
   /** Replaces the step list mid-tour when the underlying state changes. */
   setSteps: (steps: OnboardingStep[]) => void;
@@ -95,7 +107,11 @@ interface OnboardingState {
    */
   skip: () => void;
   /**
-   * Forgets that the tour was ever finished or skipped, so it runs again.
+   * Forgets that the tour was ever finished, so it runs again — and arms
+   * `forceNextStart` so the very next `start()` also ignores
+   * `hasEverConnected`. Without that, this would be a no-op for exactly the
+   * users `?tour=1` is for: someone already connected, asking to see the
+   * tour again.
    *
    * Completion lives in this browser's storage, not on the account — there is
    * no server-side switch to flip. Support and testing need a way back in
@@ -120,12 +136,15 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   isRunning: false,
   hasStarted: false,
   hasEverConnected: false,
+  forceNextStart: false,
 
   start: (steps) => {
     if (get().hasStarted) return;
-    if (readFlag()) return;
+    const force = get().forceNextStart;
+    if (!force && readFlag()) return;
+    if (!force && get().hasEverConnected) return;
     if (!steps.length) return;
-    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true });
+    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true, forceNextStart: false });
   },
 
   setSteps: (steps) => {
@@ -156,7 +175,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   reset: () => {
     clearFlag();
-    set({ steps: [], stepIndex: 0, isRunning: false, hasStarted: false });
+    set({ steps: [], stepIndex: 0, isRunning: false, hasStarted: false, forceNextStart: true });
   },
 
   complete: () => {
