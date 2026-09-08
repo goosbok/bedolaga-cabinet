@@ -57,7 +57,8 @@ describe('shouldPersistCompletion', () => {
 
   it('does not persist on the connect step when the user never connected', () => {
     // Clicking to the end of the tour is not the same as switching the VPN on:
-    // this user gets the tour again, and "Skip" is their way out.
+    // this user gets the tour again next visit, same as if they had skipped
+    // early. The only door out for good is actually connecting.
     expect(shouldPersistCompletion(fullTour, 2, false)).toBe(false);
   });
 
@@ -120,22 +121,23 @@ describe('useOnboardingStore', () => {
     expect(useOnboardingStore.getState().stepIndex).toBe(0);
   });
 
-  it('skip always sets the persisted flag', () => {
+  it('skip does not persist — the tour is not marked done', () => {
     const s = useOnboardingStore.getState();
     s.start(shortTour);
     s.skip();
     expect(useOnboardingStore.getState().isRunning).toBe(false);
-    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
   });
 
-  it('skip persists even on the connect step when the user never connected', () => {
+  it('skip does not persist even on the connect step when the user never connected', () => {
     const s = useOnboardingStore.getState();
     s.start(fullTour);
     s.next();
     s.next();
     s.skip();
-    // An explicit opt-out stays an opt-out, connected or not.
-    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
+    // Leaving early is leaving early, connect step or not — only actually
+    // connecting marks the tour done for good.
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
   });
 
   it('complete sets the flag when the user finished on the connect step and has connected', () => {
@@ -211,10 +213,10 @@ describe('useOnboardingStore', () => {
       expect(isOnboardingDismissed()).toBe(false);
     });
 
-    it('is true once the user skipped', () => {
+    it('stays false after the user skips — skip is not permanent', () => {
       useOnboardingStore.getState().start(shortTour);
       useOnboardingStore.getState().skip();
-      expect(isOnboardingDismissed()).toBe(true);
+      expect(isOnboardingDismissed()).toBe(false);
     });
 
     it('stays false after a tour that ended without connecting', () => {
@@ -229,8 +231,12 @@ describe('useOnboardingStore', () => {
 
     it('reset() lets a finished tour run again', () => {
       const s = useOnboardingStore.getState();
-      s.start(shortTour);
-      s.skip();
+      // Only a real completion persists the flag now — skip() no longer does.
+      s.setHasEverConnected(true);
+      s.start(fullTour);
+      s.next();
+      s.next();
+      s.complete();
       expect(isOnboardingDismissed()).toBe(true);
 
       useOnboardingStore.getState().reset();
@@ -252,9 +258,20 @@ describe('useOnboardingStore', () => {
     });
 
     it('agrees with start(): dismissed means start is a no-op', () => {
-      useOnboardingStore.getState().start(shortTour);
-      useOnboardingStore.getState().skip();
-      useOnboardingStore.setState({ hasStarted: false, steps: [], isRunning: false });
+      const s = useOnboardingStore.getState();
+      s.setHasEverConnected(true);
+      s.start(fullTour);
+      s.next();
+      s.next();
+      s.complete();
+      useOnboardingStore.setState({
+        hasStarted: false,
+        steps: [],
+        isRunning: false,
+        // Isolate the persisted-flag path from a separate hasEverConnected
+        // gate added by a later task — this test is specifically about the flag.
+        hasEverConnected: false,
+      });
 
       expect(isOnboardingDismissed()).toBe(true);
       useOnboardingStore.getState().start(fullTour);

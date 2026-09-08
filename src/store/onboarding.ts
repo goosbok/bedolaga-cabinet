@@ -33,14 +33,15 @@ export const isOnboardingDismissed = (): boolean => readFlag();
  *
  * Someone who never pressed "Activate Free" gets no connect step at all, and
  * would otherwise be marked done forever after a couple of dashboard steps —
- * losing exactly the user this tour exists for. They see it again next visit;
- * "Skip" is how they opt out for good.
+ * losing exactly the user this tour exists for. They see it again next visit.
  *
  * The traffic check exists for the same reason one step further along: clicking
  * through to the last step is not the same as switching the VPN on. A user who
  * reaches the end without ever connecting gets the tour again on their next
  * visit — deliberately, because they have not done the thing the tour exists
- * for. "Skip" remains their way out.
+ * for. Once they do connect — on this device or another — `start()`'s own
+ * `hasEverConnected` check (below) stops the tour from starting at all,
+ * persisted flag or not.
  *
  * This deliberately checks the *current* step rather than merely whether a
  * connect step exists in the list. It is not sufficient on its own, though: the
@@ -86,7 +87,12 @@ interface OnboardingState {
    * waiting on the page they left.
    */
   goTo: (index: number) => void;
-  /** Explicit opt-out: never show the tour again. */
+  /**
+   * The user closed the tour early, from the visible button or Escape. Does
+   * not persist — same as walking away without finishing, so the tour comes
+   * back next visit unless they've connected by then. `complete()` on the
+   * connect step is the only path that marks the tour done for good.
+   */
   skip: () => void;
   /**
    * Forgets that the tour was ever finished or skipped, so it runs again.
@@ -145,7 +151,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     })),
 
   skip: () => {
-    writeFlag();
     set({ isRunning: false });
   },
 
