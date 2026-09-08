@@ -1,6 +1,7 @@
 import { getColorGradient } from '@/utils/colorParser';
 import { ThemeIcon } from './ThemeIcon';
 import type { BlockRendererProps } from './types';
+import { getVisibleBlocks } from './visibility';
 
 export function CardsBlock({
   blocks,
@@ -10,13 +11,7 @@ export function CardsBlock({
   getSvgHtml,
   renderBlockButtons,
 }: BlockRendererProps) {
-  const visibleBlocks = blocks.filter(
-    (b) =>
-      getLocalizedText(b.title) ||
-      getLocalizedText(b.description) ||
-      b.buttons?.length ||
-      b.customNode,
-  );
+  const visibleBlocks = getVisibleBlocks(blocks, getLocalizedText);
 
   if (!visibleBlocks.length) return null;
 
@@ -28,6 +23,7 @@ export function CardsBlock({
         return (
           <div
             key={index}
+            data-onboarding={block.onboardingAnchor}
             className={`rounded-2xl border p-4 sm:p-5 ${
               isLight
                 ? 'border-dark-700/60 bg-white/80 shadow-sm'

@@ -1513,14 +1513,22 @@ input[type="checkbox"]:hover:not(:checked) {
 }
 
 /* Onboarding styles */
+/* No background of its own: the dimming comes entirely from the spotlight's
+   ring shadow below, so the highlighted element stays at full brightness. */
 .onboarding-overlay {
   @apply pointer-events-none fixed inset-0 z-[100];
-  background: rgba(0, 0, 0, 0.75);
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-spotlight {
+/* The blocker frame carries pointer-events; the spotlight rectangle is left
+   uncovered so clicks still reach the real control underneath — without that an
+   action step ("press Activate Free") could not be completed at all. */
+.onboarding-blocker {
   @apply pointer-events-auto absolute;
+}
+
+.onboarding-spotlight {
+  @apply pointer-events-none absolute;
   border-radius: 16px;
   box-shadow:
     0 0 0 9999px rgba(0, 0, 0, 0.75),
@@ -1540,10 +1548,6 @@ input[type="checkbox"]:hover:not(:checked) {
 }
 
 /* Light theme onboarding */
-.light .onboarding-overlay {
-  background: rgba(0, 0, 0, 0.5);
-}
-
 .light .onboarding-spotlight {
   box-shadow:
     0 0 0 9999px rgba(0, 0, 0, 0.5),

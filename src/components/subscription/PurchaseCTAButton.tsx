@@ -8,11 +8,14 @@ interface PurchaseCTAButtonProps {
   subscription: Subscription | null;
   /** In multi-tariff mode, link to /subscriptions/:id/renew instead of /subscription/purchase */
   isMultiTariff?: boolean;
+  /** Onboarding tour target placed on the prompt's outer element. */
+  dataOnboarding?: string;
 }
 
 export default function PurchaseCTAButton({
   subscription,
   isMultiTariff = false,
+  dataOnboarding,
 }: PurchaseCTAButtonProps) {
   const { t } = useTranslation();
 
@@ -51,7 +54,7 @@ export default function PurchaseCTAButton({
       : '/subscription/purchase';
 
   return (
-    <Link to={linkTo} className="block">
+    <Link to={linkTo} data-onboarding={dataOnboarding} className="block">
       <HoverBorderGradient
         accentColor={accentColor}
         duration={4}

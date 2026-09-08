@@ -1,4 +1,4 @@
-import apiClient from './client';
+import apiClient, { isNotFound } from './client';
 
 export type InfoPageType = 'page' | 'faq';
 
@@ -72,15 +72,29 @@ export interface InfoPageReorderRequest {
 
 export const infoPagesApi = {
   // Public endpoints
+  // Bots older than the custom-InfoPages feature return 404 here. That is not an
+  // error condition — it means "no custom pages", and the Info tabs gate their
+  // content queries on this one resolving, so letting it reject stalls the whole
+  // page for the retry window on every visit.
   getTabReplacements: async (): Promise<TabReplacements> => {
-    const response = await apiClient.get<TabReplacements>('/cabinet/info-pages/tab-replacements');
-    return response.data;
+    try {
+      const response = await apiClient.get<TabReplacements>('/cabinet/info-pages/tab-replacements');
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return { faq: null, rules: null, privacy: null, offer: null };
+      throw error;
+    }
   },
 
   getPages: async (pageType?: InfoPageType): Promise<InfoPageListItem[]> => {
     const params = pageType ? { page_type: pageType } : undefined;
-    const response = await apiClient.get<InfoPageListItem[]>('/cabinet/info-pages', { params });
-    return response.data;
+    try {
+      const response = await apiClient.get<InfoPageListItem[]>('/cabinet/info-pages', { params });
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return [];
+      throw error;
+    }
   },
 
   getPageBySlug: async (slug: string): Promise<InfoPage> => {

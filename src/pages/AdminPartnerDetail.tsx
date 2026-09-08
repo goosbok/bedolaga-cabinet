@@ -192,11 +192,20 @@ export default function AdminPartnerDetail() {
               <div className="mt-1 text-2xl font-bold text-accent-400">
                 {partner.commission_percent ?? 0}%
               </div>
+              <div className="mt-1 text-sm text-dark-400">
+                {t('admin.partnerDetail.commission.paymentsTitle')}:{' '}
+                {(partner.max_commission_payments ?? 0) === 0
+                  ? t('admin.partnerDetail.commission.unlimited')
+                  : partner.max_commission_payments}
+              </div>
             </div>
             <button
               onClick={() =>
                 navigate(`/admin/partners/${userId}/commission`, {
-                  state: { currentCommission: partner.commission_percent ?? 0 },
+                  state: {
+                    currentCommission: partner.commission_percent ?? 0,
+                    currentMaxPayments: partner.max_commission_payments ?? 0,
+                  },
                 })
               }
               className="rounded-lg bg-dark-700 px-4 py-2 text-sm text-dark-300 transition-colors hover:bg-dark-600 hover:text-dark-100"

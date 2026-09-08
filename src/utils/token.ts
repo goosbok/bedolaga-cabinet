@@ -86,33 +86,65 @@ export function isTokenValid(token: string | null): boolean {
   return !isTokenExpired(token);
 }
 
+// Storage is not always writable: Safari Private Browsing, an in-app webview
+// with site data switched off, a full quota. Every write below is therefore
+// best-effort and the session is also held in memory.
+//
+// Without this a failed write was swallowed whole — and because the writes sat
+// inside one try block, a throw on the access token skipped the refresh token
+// too. The app went on believing the login had succeeded while storage held
+// nothing, so every request left without an Authorization header, the first
+// action a user took came back "Authentication required", and the refresh that
+// should have rescued it had no token to use — dropping them on the login page.
+// Reported from a real registration, on video: verification succeeded, the
+// cabinet opened, and activating the trial threw the user out.
+//
+// Memory does not survive a reload. It does keep the tab the user is in working.
+let memoryAccessToken: string | null = null;
+let memoryRefreshToken: string | null = null;
+
 export const tokenStorage = {
   getAccessToken(): string | null {
     try {
-      return sessionStorage.getItem(TOKEN_KEYS.ACCESS);
+      return sessionStorage.getItem(TOKEN_KEYS.ACCESS) ?? memoryAccessToken;
     } catch {
-      return null;
+      return memoryAccessToken;
     }
   },
 
   getRefreshToken(): string | null {
     try {
-      return localStorage.getItem(TOKEN_KEYS.REFRESH) || sessionStorage.getItem(TOKEN_KEYS.REFRESH);
+      return (
+        localStorage.getItem(TOKEN_KEYS.REFRESH) ||
+        sessionStorage.getItem(TOKEN_KEYS.REFRESH) ||
+        memoryRefreshToken
+      );
     } catch {
-      return null;
+      return memoryRefreshToken;
     }
   },
 
   setTokens(accessToken: string, refreshToken: string): void {
+    // Memory first: it cannot fail, so the session is usable even if every
+    // persistence attempt below throws.
+    memoryAccessToken = accessToken;
+    memoryRefreshToken = refreshToken;
+    // Separate try blocks on purpose — one unwritable store must not cost us
+    // the other.
     try {
       sessionStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
-      localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
       sessionStorage.removeItem(TOKEN_KEYS.REFRESH);
+    } catch {}
+    try {
+      localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+    } catch {}
+    try {
       mirrorRefreshTokenToCloud(refreshToken);
     } catch {}
   },
 
   setAccessToken(accessToken: string): void {
+    memoryAccessToken = accessToken;
     try {
       sessionStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
     } catch {
@@ -121,6 +153,8 @@ export const tokenStorage = {
   },
 
   clearTokens(): void {
+    memoryAccessToken = null;
+    memoryRefreshToken = null;
     try {
       sessionStorage.removeItem(TOKEN_KEYS.ACCESS);
       sessionStorage.removeItem(TOKEN_KEYS.REFRESH);

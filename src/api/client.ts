@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { retrieveRawInitData } from '@telegram-apps/sdk-react';
 import {
   tokenStorage,
@@ -106,9 +106,24 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
         return config;
       }
     } else if (!token && tokenStorage.getRefreshToken()) {
+      // No access token but a refresh token is on hand. This is the normal state
+      // for a freshly opened tab: the access token lives in sessionStorage (per
+      // tab) while the refresh token lives in localStorage (shared), so following
+      // an email-verification link or leaving Telegram's in-app browser for the
+      // default one lands here with a perfectly valid session.
       const newToken = await tokenRefreshManager.refreshAccessToken();
       if (newToken) {
         token = newToken;
+      } else if (!tokenRefreshManager.lastFailureWasTransport) {
+        // The refresh token itself was rejected, so there is no session to
+        // recover. Letting the request go out with no Authorization header made
+        // the backend answer "Authentication required", which the UI then showed
+        // as a failed action on a page that still looked signed in — reported
+        // from a real registration, where the trial activation appeared to fail.
+        // Send the user to sign in instead of surfacing a bare 401.
+        tokenStorage.clearTokens();
+        safeRedirectToLogin();
+        return config;
       }
     }
 
@@ -292,5 +307,17 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+/**
+ * True when the backend answered 404.
+ *
+ * The cabinet ships independently of the bot, so it can call an endpoint a
+ * running bot version does not serve yet. For optional data that is the same
+ * as "nothing configured", callers fall back to a neutral default instead of
+ * surfacing an error — a missing feature must not stall the page that would
+ * otherwise render fine without it.
+ */
+export const isNotFound = (error: unknown): boolean =>
+  axios.isAxiosError(error) && error.response?.status === 404;
 
 export default apiClient;

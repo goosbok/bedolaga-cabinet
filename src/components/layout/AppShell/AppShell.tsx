@@ -20,6 +20,7 @@ import WebSocketNotifications from '@/components/WebSocketNotifications';
 import CampaignBonusNotifier from '@/components/CampaignBonusNotifier';
 import SuccessNotificationModal from '@/components/SuccessNotificationModal';
 import { PromptDialogHost } from '@/components/PromptDialogHost';
+import OnboardingRunner from '@/components/OnboardingRunner';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import TicketNotificationBell from '@/components/TicketNotificationBell';
 import {
@@ -188,6 +189,7 @@ export function AppShell({ children }: AppShellProps) {
       <CampaignBonusNotifier />
       <SuccessNotificationModal />
       <PromptDialogHost />
+      <OnboardingRunner />
 
       {/* Desktop Header */}
       {/* w-screen вместо left-0 right-0: right-0 упирается в край вьюпорта БЕЗ
@@ -227,6 +229,8 @@ export function AppShell({ children }: AppShellProps) {
               )}
             </div>
             <span className="text-base font-semibold text-dark-100">{appName}</span>
+            {/* Platega verification codeword — remove after kassa approval */}
+            <span className="text-[10px] text-dark-600">чекап</span>
           </Link>
 
           {/* Navigation — единая «капсула» (segmented control): все пункты видны

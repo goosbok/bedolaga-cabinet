@@ -13,6 +13,7 @@ export default function AdminApplicationReview() {
   const queryClient = useQueryClient();
 
   const [commission, setCommission] = useState('10');
+  const [maxPayments, setMaxPayments] = useState('0');
   const [rejectComment, setRejectComment] = useState('');
 
   // Try to get application from navigate state, fallback to fetching
@@ -28,8 +29,19 @@ export default function AdminApplicationReview() {
   const app = passedApp ?? fetchedApps?.items.find((a) => a.id === Number(id));
 
   const approveMutation = useMutation({
-    mutationFn: ({ appId, commissionPercent }: { appId: number; commissionPercent: number }) =>
-      partnerApi.approveApplication(appId, { commission_percent: commissionPercent }),
+    mutationFn: ({
+      appId,
+      commissionPercent,
+      maxCommissionPayments,
+    }: {
+      appId: number;
+      commissionPercent: number;
+      maxCommissionPayments: number;
+    }) =>
+      partnerApi.approveApplication(appId, {
+        commission_percent: commissionPercent,
+        max_commission_payments: maxCommissionPayments,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-partner-applications'] });
       queryClient.invalidateQueries({ queryKey: ['admin-partners'] });
@@ -170,18 +182,40 @@ export default function AdminApplicationReview() {
             className="mb-4 w-full rounded-lg border border-dark-600 bg-dark-700 px-3 py-2 text-dark-100 outline-none focus:border-accent-500"
             placeholder="10"
           />
+          <label className="mb-1 block text-sm font-medium text-dark-300">
+            {t('admin.partners.approveDialog.maxPaymentsLabel')}
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="1000"
+            value={maxPayments}
+            onChange={(e) => setMaxPayments(e.target.value)}
+            className="mb-1 w-full rounded-lg border border-dark-600 bg-dark-700 px-3 py-2 text-dark-100 outline-none focus:border-accent-500"
+            placeholder="0"
+          />
+          <p className="mb-4 text-xs text-dark-500">
+            {t('admin.partners.approveDialog.maxPaymentsHint')}
+          </p>
           <button
             onClick={() => {
               const val = Number(commission);
-              if (val >= 1 && val <= 100) {
-                approveMutation.mutate({ appId: app.id, commissionPercent: val });
+              const payments = Number(maxPayments);
+              if (val >= 1 && val <= 100 && payments >= 0) {
+                approveMutation.mutate({
+                  appId: app.id,
+                  commissionPercent: val,
+                  maxCommissionPayments: payments,
+                });
               }
             }}
             disabled={
               approveMutation.isPending ||
               !commission ||
               Number(commission) < 1 ||
-              Number(commission) > 100
+              Number(commission) > 100 ||
+              maxPayments === '' ||
+              Number(maxPayments) < 0
             }
             className="w-full rounded-lg bg-success-500 px-4 py-3 font-medium text-white transition-colors hover:bg-success-600 disabled:opacity-50"
           >

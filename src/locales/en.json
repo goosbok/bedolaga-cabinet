@@ -474,7 +474,7 @@
     },
     "trialUpgrade": {
       "title": "Choose a plan to continue",
-      "description": "Your trial period is ending soon. Select a plan to continue using VPN without restrictions."
+      "description": "Your trial period is ending soon. Select a plan to continue using VPN."
     },
     "expiredBanner": {
       "title": "Subscription expired",
@@ -3052,7 +3052,9 @@
       "approveDialog": {
         "title": "Approve Application",
         "description": "Approve partner application from {{name}}",
-        "commissionLabel": "Commission (%)"
+        "commissionLabel": "Commission (%)",
+        "maxPaymentsLabel": "How many payments earn commission",
+        "maxPaymentsHint": "0 — commission from every payment an invited user makes. Any other number — only from that many first payments of each invited user."
       },
       "rejectDialog": {
         "title": "Reject Application",
@@ -3108,7 +3110,9 @@
       },
       "commission": {
         "title": "Commission",
-        "update": "Update"
+        "update": "Update",
+        "paymentsTitle": "Payments with commission",
+        "unlimited": "all"
       },
       "campaigns": {
         "title": "Assigned Campaigns",
@@ -3135,7 +3139,9 @@
       "commissionDialog": {
         "title": "Update Commission",
         "description": "Set a new commission percentage for this partner.",
-        "label": "Commission (%)"
+        "label": "Commission (%)",
+        "maxPaymentsLabel": "How many payments earn commission",
+        "maxPaymentsHint": "0 — commission from every payment an invited user makes. Any other number — only from that many first payments of each invited user."
       },
       "revokeDialog": {
         "title": "Revoke Partner Status?",
@@ -5099,16 +5105,44 @@
     "noDiscounts": "No discounts"
   },
   "onboarding": {
-    "skip": "Skip",
+    "skip": "Do it later",
     "finish": "Finish",
     "steps": {
       "welcome": {
         "title": "Welcome!",
         "description": "This is your personal cabinet. Here you can manage your subscription, top up balance and connect devices."
       },
-      "connectDevices": {
-        "title": "Connect Devices",
-        "description": "Click this button to get instructions on how to connect VPN on your devices."
+      "trial": {
+        "title": "Try It for Free",
+        "description": "Press the “Activate Free” button — your access starts right away. No payment, no card needed."
+      },
+      "dashboardSubscription": {
+        "title": "Open Your Subscription",
+        "description": "Press your subscription card to open it. Everything about it lives there: traffic, devices, your subscription key and plan changes."
+      },
+      "subLink": {
+        "title": "Your Subscription Key",
+        "description": "This is your subscription key. The button on the right copies it: opened in a browser it shows the connection guide, and the same link can be shared with family and friends."
+      },
+      "subConnectDevice": {
+        "title": "One step left — install the app",
+        "description": "Tap \"Connect Device\" to open the page with the app for your phone or computer and step-by-step setup. The counter next to it shows how many devices are already connected."
+      },
+      "subUpgrade": {
+        "title": "Choose a Plan",
+        "description": "When your trial runs out, or you need more traffic and devices, this is where you pick a plan."
+      },
+      "installApp": {
+        "title": "Install the App",
+        "description": "We already know which device you are on. Press the button to install the right app."
+      },
+      "addSubscription": {
+        "title": "Add Your Subscription",
+        "description": "One tap opens the app and loads your subscription automatically. Nothing to copy or paste."
+      },
+      "connect": {
+        "title": "Connect to VPN",
+        "description": "Open the app, pick a server and press the big connect button. This is the last step, everything works on its own after that."
       },
       "balance": {
         "title": "Your Balance",

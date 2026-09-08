@@ -13,6 +13,8 @@ interface TrialOfferCardProps {
   balanceRubles: number;
   activateTrialMutation: UseMutationResult<unknown, unknown, void, unknown>;
   trialError: string | null;
+  /** Onboarding tour target placed on the card's outer element. */
+  dataOnboarding?: string;
 }
 
 export default function TrialOfferCard({
@@ -21,6 +23,7 @@ export default function TrialOfferCard({
   balanceRubles,
   activateTrialMutation,
   trialError,
+  dataOnboarding,
 }: TrialOfferCardProps) {
   const { t } = useTranslation();
   const { formatAmount, currencySymbol } = useCurrency();
@@ -31,6 +34,7 @@ export default function TrialOfferCard({
 
   return (
     <div
+      data-onboarding={dataOnboarding}
       className="relative overflow-hidden rounded-3xl text-center"
       style={{
         background: g.cardBg,
