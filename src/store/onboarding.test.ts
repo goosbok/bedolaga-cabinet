@@ -170,11 +170,10 @@ describe('useOnboardingStore', () => {
 
   it('complete sets the flag when the user finished on the connect step and has connected', () => {
     const s = useOnboardingStore.getState();
-    s.setHasEverConnected(true);
-    s.reset();
     s.start(fullTour);
     s.next();
     s.next();
+    s.setHasEverConnected(true);
     s.complete();
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe('true');
   });
@@ -261,11 +260,10 @@ describe('useOnboardingStore', () => {
     it('reset() lets a finished tour run again', () => {
       const s = useOnboardingStore.getState();
       // Only a real completion persists the flag now — skip() no longer does.
-      s.setHasEverConnected(true);
-      s.reset();
       s.start(fullTour);
       s.next();
       s.next();
+      s.setHasEverConnected(true);
       s.complete();
       expect(isOnboardingDismissed()).toBe(true);
 
@@ -276,6 +274,10 @@ describe('useOnboardingStore', () => {
       // hasStarted has to fall too, or start() refuses on the guard instead.
       expect(useOnboardingStore.getState().hasStarted).toBe(false);
 
+      // hasEverConnected is still true here — this final start() only succeeds
+      // because reset() (above) armed forceNextStart. Without that override this
+      // assertion would fail, which is exactly the ?tour=1 guarantee the
+      // hasEverConnected gate needs to preserve.
       useOnboardingStore.getState().start(fullTour);
       expect(useOnboardingStore.getState().isRunning).toBe(true);
       expect(useOnboardingStore.getState().stepIndex).toBe(0);
@@ -289,18 +291,17 @@ describe('useOnboardingStore', () => {
 
     it('agrees with start(): dismissed means start is a no-op', () => {
       const s = useOnboardingStore.getState();
-      s.setHasEverConnected(true);
-      s.reset();
       s.start(fullTour);
       s.next();
       s.next();
+      s.setHasEverConnected(true);
       s.complete();
       useOnboardingStore.setState({
         hasStarted: false,
         steps: [],
         isRunning: false,
-        // Isolate the persisted-flag path from a separate hasEverConnected
-        // gate added by a later task — this test is specifically about the flag.
+        // Isolate the persisted-flag path from the hasEverConnected gate this
+        // task adds — this test is specifically about the flag.
         hasEverConnected: false,
         forceNextStart: false,
       });
