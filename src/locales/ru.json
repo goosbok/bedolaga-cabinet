@@ -5651,7 +5651,7 @@
     "noDiscounts": "Нет скидок"
   },
   "onboarding": {
-    "skip": "Пропустить",
+    "skip": "Пройти в другой раз",
     "finish": "Готово",
     "steps": {
       "welcome": {

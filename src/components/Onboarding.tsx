@@ -407,11 +407,15 @@ export default function Onboarding({
           {step.description}
         </p>
 
-        {/* Actions. No visible "skip": the tour is short and only ever shown to
-            someone who has not connected yet, so the product choice is to keep
-            guiding rather than offer an exit on every step. Escape still ends it
-            for keyboard users. */}
-        <div className="flex items-center justify-end">
+        {/* Actions. Skip is visible on every step, including one that hides
+            "Next" while it waits on the user — it only makes visible the exit
+            Escape already provides, it does not add a new one. Neither this
+            button nor Escape mark the tour done: closing early just brings it
+            back next visit, same as walking away without finishing. */}
+        <div className="flex items-center justify-between">
+          <button onClick={onSkip} className="btn-ghost px-4 py-1.5 text-sm">
+            {t('onboarding.skip', 'Do it later')}
+          </button>
           <div className="flex gap-2">
             {showNext && (
               <button onClick={handleNext} className="btn-primary px-4 py-1.5 text-sm">
