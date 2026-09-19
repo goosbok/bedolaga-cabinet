@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { UseMutationResult } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 import type { TrialInfo } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTheme } from '../../hooks/useTheme';
@@ -12,6 +12,8 @@ interface TrialOfferCardProps {
   balanceKopeks: number;
   balanceRubles: number;
   activateTrialMutation: UseMutationResult<unknown, unknown, void, unknown>;
+  /** Активация безлимитного (вендорского) триала — показывается, если trialInfo.unlimited. */
+  activateUnlimitedTrialMutation?: UseMutationResult<unknown, unknown, void, unknown>;
   trialError: string | null;
   /** Onboarding tour target placed on the card's outer element. */
   dataOnboarding?: string;
@@ -22,6 +24,7 @@ export default function TrialOfferCard({
   balanceKopeks,
   balanceRubles,
   activateTrialMutation,
+  activateUnlimitedTrialMutation,
   trialError,
   dataOnboarding,
 }: TrialOfferCardProps) {
@@ -262,6 +265,27 @@ export default function TrialOfferCard({
           }
         >
           {activateTrialMutation.isPending ? t('common.loading') : t('subscription.trial.activate')}
+        </button>
+      )}
+
+      {/* Безлимитный триал (через вендора): показываем второй кнопкой, если доступен */}
+      {trialInfo.unlimited && activateUnlimitedTrialMutation && (
+        <button
+          onClick={() =>
+            !activateUnlimitedTrialMutation.isPending && activateUnlimitedTrialMutation.mutate()
+          }
+          disabled={activateUnlimitedTrialMutation.isPending}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-4 text-base font-bold tracking-tight transition-all duration-300 disabled:opacity-50"
+          style={{
+            background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgba(124,58,237,0.25)',
+          }}
+        >
+          <BoltIcon className="h-5 w-5" />
+          {activateUnlimitedTrialMutation.isPending
+            ? t('common.loading')
+            : t('subscription.trial.activateUnlimited', 'Безлимит · 1 день')}
         </button>
       )}
     </div>

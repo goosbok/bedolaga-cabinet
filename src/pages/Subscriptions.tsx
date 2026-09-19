@@ -101,6 +101,22 @@ export default function Subscriptions() {
     },
   });
 
+  const activateUnlimitedTrialMutation = useMutation({
+    mutationFn: () => subscriptionApi.activateUnlimitedTrial(),
+    onSuccess: () => {
+      setTrialError(null);
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions-list'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-info'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
+      refreshUser();
+    },
+    onError: (error: { response?: { data?: { detail?: string } } }) => {
+      setTrialError(error.response?.data?.detail || t('common.error'));
+    },
+  });
+
   // Single-tariff mode with one subscription: skip list, go directly to detail
   if (data && !isMultiTariff && subscriptions.length === 1) {
     return <Navigate to={`/subscriptions/${subscriptions[0].id}`} replace />;
@@ -156,13 +172,14 @@ export default function Subscriptions() {
       )}
 
       {/* Empty state: показываем триал, если доступен; иначе — обычный empty */}
-      {hasNoSubscriptions && !trialLoading && trialInfo?.is_available && (
+      {hasNoSubscriptions && !trialLoading && (trialInfo?.is_available || trialInfo?.unlimited) && (
         <div className="space-y-4">
           <TrialOfferCard
             trialInfo={trialInfo}
             balanceKopeks={balanceData?.balance_kopeks ?? 0}
             balanceRubles={balanceData?.balance_rubles ?? 0}
             activateTrialMutation={activateTrialMutation}
+            activateUnlimitedTrialMutation={activateUnlimitedTrialMutation}
             trialError={trialError}
           />
           {/* Новый пользователь не обязан активировать триал, чтобы попасть

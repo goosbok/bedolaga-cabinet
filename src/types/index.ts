@@ -205,6 +205,8 @@ export interface TrialInfo {
   price_kopeks: number;
   price_rubles: number;
   reason_unavailable: string | null;
+  /** Доступен ли клиенту безлимитный (вендорский) триал — отдельная кнопка. */
+  unlimited?: boolean;
 }
 
 // Purchase options types
