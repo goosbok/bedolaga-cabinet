@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { ClipboardIcon, PlusIcon } from '@/components/icons';
+import { BoltIcon, ClipboardIcon, PlusIcon } from '@/components/icons';
 import { subscriptionApi } from '../api/subscription';
 import { balanceApi } from '../api/balance';
 import { useTheme } from '../hooks/useTheme';
@@ -69,12 +69,15 @@ export default function Subscriptions() {
     (s) => !s.is_trial && (s.status === 'active' || s.status === 'limited'),
   );
 
-  // Если у юзера нет подписок — проверяем доступность триала, иначе
-  // (в multi-tariff) ему вообще негде увидеть оффер.
+  // Тянем trial-info ВСЕГДА (не только при пустом кабинете): безлимитный
+  // (вендорский) триал — отдельный вид, и юзер, уже взявший лимитный триал,
+  // всё ещё вправе взять безлимитный. Без этого «оба триала» недостижимы из
+  // кабинета, потому что оффер-карточка ниже показывается только при
+  // полностью пустом кабинете.
   const { data: trialInfo, isLoading: trialLoading } = useQuery({
     queryKey: ['trial-info'],
     queryFn: () => subscriptionApi.getTrialInfo(),
-    enabled: hasNoSubscriptions,
+    enabled: !isLoading,
     staleTime: 30_000,
   });
 
@@ -197,6 +200,38 @@ export default function Subscriptions() {
       )}
       {hasNoSubscriptions && !trialLoading && !trialInfo?.is_available && (
         <EmptyState onBuy={() => navigate('/subscription/purchase')} />
+      )}
+
+      {/* Безлимитный (вендорский) триал остаётся доступен, даже если у юзера уже
+          есть подписки (например, он взял лимитный триал): без этого «оба триала»
+          недостижимы из кабинета — оффер-карточка выше показывается только при
+          полностью пустом кабинете. Отдельная кнопка появляется, пока безлимитный
+          триал не использован (trialInfo.unlimited). */}
+      {!isLoading && subscriptions.length > 0 && trialInfo?.unlimited && (
+        <div className="space-y-2">
+          {trialError && (
+            <div className="rounded-xl border border-error-500/30 bg-error-500/10 p-3 text-center text-sm text-error-400">
+              {trialError}
+            </div>
+          )}
+          <button
+            onClick={() =>
+              !activateUnlimitedTrialMutation.isPending && activateUnlimitedTrialMutation.mutate()
+            }
+            disabled={activateUnlimitedTrialMutation.isPending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold tracking-tight transition-all duration-300 disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+              color: '#fff',
+              boxShadow: '0 4px 20px rgba(124,58,237,0.25)',
+            }}
+          >
+            <BoltIcon className="h-5 w-5" />
+            {activateUnlimitedTrialMutation.isPending
+              ? t('common.loading')
+              : t('subscription.trial.activateUnlimited', 'Безлимит · 1 день')}
+          </button>
+        </div>
       )}
 
       {/* Subscription grid */}
