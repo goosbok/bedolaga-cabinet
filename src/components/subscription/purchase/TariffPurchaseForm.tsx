@@ -103,6 +103,22 @@ export function TariffPurchaseForm({
     },
   });
 
+  // Синхронный анти-дабл-клик: disabled={isPending} блокирует кнопку только
+  // ПОСЛЕ ре-рендера, поэтому сверхбыстрый повторный клик в том же кадре успел бы
+  // отправить вторую покупку до блокировки (бэкенд её потом вернёт как «тариф
+  // уже активен», но лишнее списание всё же мелькнёт). Ref гасит второй вызов
+  // синхронно, в том же тике; сбрасывается по завершении мутации.
+  const isPurchasingRef = useRef(false);
+  const handlePurchase = () => {
+    if (isPurchasingRef.current || purchaseMutation.isPending) return;
+    isPurchasingRef.current = true;
+    purchaseMutation.mutate(undefined, {
+      onSettled: () => {
+        isPurchasingRef.current = false;
+      },
+    });
+  };
+
   // СБП-оформление: первое списание = подтверждение привязки в банке; период
   // на форме не участвует — списания идут по каденс-правилу тарифа.
   const sbpPurchaseMutation = useMutation({
@@ -268,7 +284,7 @@ export function TariffPurchaseForm({
                 )}
 
                 <button
-                  onClick={() => purchaseMutation.mutate()}
+                  onClick={handlePurchase}
                   disabled={purchaseMutation.isPending}
                   className="btn-primary w-full py-3"
                 >
@@ -696,7 +712,7 @@ export function TariffPurchaseForm({
                     </div>
 
                     <button
-                      onClick={() => purchaseMutation.mutate()}
+                      onClick={handlePurchase}
                       disabled={purchaseMutation.isPending}
                       className="btn-primary w-full py-3"
                     >
