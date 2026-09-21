@@ -15,6 +15,11 @@ const step = (target: string, route?: string): OnboardingStep => ({
   route,
 });
 
+const actionStep = (target: string, route?: string): OnboardingStep => ({
+  ...step(target, route),
+  awaitsUserAction: true,
+});
+
 const fullTour = [
   step('welcome'),
   step('sub-connect-device', '/subscriptions/1'),
@@ -44,6 +49,7 @@ beforeEach(() => {
     hasStarted: false,
     hasEverConnected: false,
     forceNextStart: false,
+    canResume: false,
   });
 });
 
@@ -231,6 +237,51 @@ describe('useOnboardingStore', () => {
   it('setSteps is ignored when the tour is not running', () => {
     useOnboardingStore.getState().setSteps(fullTour);
     expect(useOnboardingStore.getState().steps).toHaveLength(0);
+  });
+
+  it("the trial step's 10s escape re-opens the tour once the action swaps the list", () => {
+    const s = useOnboardingStore.getState();
+    s.start([step('welcome'), actionStep('trial-card')]);
+    s.next(); // stand on the trial step
+    s.complete(); // the escape hatch fires complete() on this last, action step
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+    expect(useOnboardingStore.getState().canResume).toBe(true);
+    // Activating the trial republishes a DIFFERENT list (subscription steps).
+    s.setSteps([step('welcome'), actionStep('dashboard-subscription'), step('install-connect')]);
+    expect(useOnboardingStore.getState().isRunning).toBe(true);
+    expect(useOnboardingStore.getState().steps.map((x) => x.target)).toContain(
+      'dashboard-subscription',
+    );
+  });
+
+  it('the escape does not re-open on a same-content republish (no action yet)', () => {
+    const s = useOnboardingStore.getState();
+    s.start([step('welcome'), actionStep('trial-card')]);
+    s.next();
+    s.complete();
+    // Another query lands and republishes the identical list — must not resume.
+    s.setSteps([step('welcome'), actionStep('trial-card')]);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+  });
+
+  it('an explicit skip never re-opens, even after the list changes', () => {
+    const s = useOnboardingStore.getState();
+    s.start([step('welcome'), actionStep('trial-card')]);
+    s.next();
+    s.skip();
+    expect(useOnboardingStore.getState().canResume).toBe(false);
+    s.setSteps([step('welcome'), actionStep('dashboard-subscription'), step('install-connect')]);
+    expect(useOnboardingStore.getState().isRunning).toBe(false);
+  });
+
+  it('a real finish on the connect step does not arm resume', () => {
+    const s = useOnboardingStore.getState();
+    s.start(fullTour);
+    s.next();
+    s.next();
+    s.setHasEverConnected(true);
+    s.complete();
+    expect(useOnboardingStore.getState().canResume).toBe(false);
   });
 
   it('abort ends the tour without persisting, even on the connect step', () => {
