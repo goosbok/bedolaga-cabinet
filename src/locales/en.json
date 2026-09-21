@@ -326,9 +326,9 @@
       "resume": "Resume"
     },
     "trialOffer": {
-      "freeTitle": "Free Trial Available",
+      "freeTitle": "Two free trials",
       "paidTitle": "Trial Subscription",
-      "freeDesc": "Try our VPN for free, no commitment required",
+      "freeDesc": "Take both — no need to choose. No card, instant access.",
       "paidDesc": "Get started with a trial subscription"
     },
     "stats": {
@@ -456,6 +456,12 @@
       "devices_other": "{{count}} devices",
       "price": "Price",
       "activate": "Activate Free",
+      "activateRegular": "Standard trial · free",
+      "regularName": "Standard · free",
+      "premiumName": "Premium · free",
+      "regularHint": "Works over Wi-Fi · 3 days",
+      "unlimitedHint": "Always and everywhere · 1 day",
+      "activationError": "Couldn't activate the trial. Please try again.",
       "payAndActivate": "Pay & Activate",
       "topUpToActivate": "Top Up Balance",
       "insufficientBalance": "Top up your balance to activate",
@@ -5114,7 +5120,7 @@
       },
       "trial": {
         "title": "Try It for Free",
-        "description": "Press the “Activate Free” button — your access starts right away. No payment, no card needed."
+        "description": "Two free trials here: “Standard” works over Wi-Fi, “Premium” works always and everywhere. You can take both — no need to choose, no card. You'll always find all your subscriptions in the “Subscription” tab."
       },
       "dashboardSubscription": {
         "title": "Open Your Subscription",

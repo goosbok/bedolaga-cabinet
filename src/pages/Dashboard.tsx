@@ -35,6 +35,7 @@ export default function Dashboard() {
   const setOnboardingSteps = useOnboardingStore((state) => state.setSteps);
   const setOnboardingHasEverConnected = useOnboardingStore((state) => state.setHasEverConnected);
   const isOnboardingRunning = useOnboardingStore((state) => state.isRunning);
+  const canResumeOnboarding = useOnboardingStore((state) => state.canResume);
   const blockingType = useBlockingStore((state) => state.blockingType);
   const [trialError, setTrialError] = useState<string | null>(null);
 
@@ -119,9 +120,61 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['balance'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
       refreshUser();
+      // After activation, take the user to the subscriptions tab — their new
+      // subscription and the second free trial live there. During the tour the
+      // step routing (and the escape→resume path) already walks the user there,
+      // so redirect only when the tour is not driving navigation itself. Read the
+      // store live: the mutation's onSuccess closure can predate the latest flags.
+      {
+        const tour = useOnboardingStore.getState();
+        if (!tour.isRunning && !tour.canResume) navigate('/subscriptions');
+      }
     },
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
-      setTrialError(error.response?.data?.detail || t('common.error'));
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
+    },
+  });
+
+  // Безлимит-триал (вендорский) — тот же оффер, что на экране «Подписка»,
+  // но выведенный и на «Главную»: туториал и фокус нового юзера здесь, поэтому
+  // премиальный триал должен быть виден вместе с бесплатным, а не только на
+  // соседнем экране, куда пользователь может не дойти.
+  const activateUnlimitedTrialMutation = useMutation({
+    mutationFn: () => subscriptionApi.activateUnlimitedTrial(),
+    onSuccess: () => {
+      setTrialError(null);
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions-list'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-info'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
+      refreshUser();
+      // After activation, take the user to the subscriptions tab — their new
+      // subscription and the second free trial live there. During the tour the
+      // step routing (and the escape→resume path) already walks the user there,
+      // so redirect only when the tour is not driving navigation itself. Read the
+      // store live: the mutation's onSuccess closure can predate the latest flags.
+      {
+        const tour = useOnboardingStore.getState();
+        if (!tour.isRunning && !tour.canResume) navigate('/subscriptions');
+      }
+    },
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
     },
   });
 
@@ -292,10 +345,15 @@ export default function Dashboard() {
         title: t('onboarding.steps.dashboardSubscription.title'),
         description: t('onboarding.steps.dashboardSubscription.description'),
         placement: 'bottom',
-        route: '/',
-        // Tapping the card navigates to the subscription screen, where the
-        // runner's landing detection picks the tour up.
+        // Activating a trial sends the user to the subscriptions tab (below and
+        // in the activate handlers), so this step lives there: the runner walks
+        // the user to /subscriptions and points at the first card. Tapping it
+        // opens the detail, where landing detection picks the tour up.
+        route: '/subscriptions',
         awaitsUserAction: true,
+        // Don't shield the page here: the second free-trial button sits right
+        // beside the card on this tab and must stay tappable during the tour (#2).
+        nonBlocking: true,
       });
     }
 
@@ -416,11 +474,14 @@ export default function Dashboard() {
   }, [subLoading, multiSubLoading, refLoading, blockingType, startOnboarding]);
 
   // Keep a running tour in sync: activating the trial creates a subscription,
-  // which unlocks the connect and installation steps without a reload.
+  // which unlocks the connect and installation steps without a reload. Also feed
+  // the list while the tour is stopped-but-resumable (the 10s escape on the trial
+  // step): the store re-opens the tour once this republishes a different list,
+  // which is exactly what activating the trial does.
   useEffect(() => {
-    if (!isOnboardingRunning) return;
+    if (!isOnboardingRunning && !canResumeOnboarding) return;
     setOnboardingSteps(onboardingSteps);
-  }, [isOnboardingRunning, setOnboardingSteps, onboardingSteps]);
+  }, [isOnboardingRunning, canResumeOnboarding, setOnboardingSteps, onboardingSteps]);
 
   // The other half of what the store needs to decide the tour is done.
   useEffect(() => {
@@ -553,12 +614,13 @@ export default function Dashboard() {
           с мульти-тариф блоком). */}
       {hasNoSubscription && !trialLoading && (
         <div className="space-y-3">
-          {trialInfo?.is_available && (
+          {(trialInfo?.is_available || trialInfo?.unlimited) && (
             <TrialOfferCard
               trialInfo={trialInfo}
               balanceKopeks={balanceData?.balance_kopeks || 0}
               balanceRubles={balanceData?.balance_rubles || 0}
               activateTrialMutation={activateTrialMutation}
+              activateUnlimitedTrialMutation={activateUnlimitedTrialMutation}
               trialError={trialError}
               dataOnboarding="trial-card"
             />

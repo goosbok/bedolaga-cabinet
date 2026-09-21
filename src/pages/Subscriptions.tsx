@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { BoltIcon, ClipboardIcon, PlusIcon } from '@/components/icons';
+import { BoltIcon, ClipboardIcon, PlusIcon, SparklesIcon } from '@/components/icons';
 import { subscriptionApi } from '../api/subscription';
 import { balanceApi } from '../api/balance';
 import { useTheme } from '../hooks/useTheme';
@@ -99,8 +99,15 @@ export default function Subscriptions() {
       queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
       refreshUser();
     },
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
-      setTrialError(error.response?.data?.detail || t('common.error'));
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
     },
   });
 
@@ -115,8 +122,15 @@ export default function Subscriptions() {
       queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
       refreshUser();
     },
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
-      setTrialError(error.response?.data?.detail || t('common.error'));
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
     },
   });
 
@@ -229,7 +243,36 @@ export default function Subscriptions() {
             <BoltIcon className="h-5 w-5" />
             {activateUnlimitedTrialMutation.isPending
               ? t('common.loading')
-              : t('subscription.trial.activateUnlimited', 'Безлимит · 1 день')}
+              : t('subscription.trial.activateUnlimited', 'Премиум подписка на 1 день')}
+          </button>
+        </div>
+      )}
+
+      {/* Обычный (лимитный) пробник остаётся доступен, если юзер взял только
+          премиум: симметрично премиум-кнопке выше. Бэкенд теперь пускает лимитный
+          триал при активном ПРОБНИКЕ (блокирует лишь платная подписка) — так «оба
+          в любом порядке». Оффер-карточка показывается лишь при пустом кабинете. */}
+      {!isLoading && subscriptions.length > 0 && trialInfo?.is_available && (
+        <div className="space-y-2">
+          {trialError && (
+            <div className="rounded-xl border border-error-500/30 bg-error-500/10 p-3 text-center text-sm text-error-400">
+              {trialError}
+            </div>
+          )}
+          <button
+            onClick={() => !activateTrialMutation.isPending && activateTrialMutation.mutate()}
+            disabled={activateTrialMutation.isPending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold tracking-tight text-white transition-all duration-300 disabled:opacity-50"
+            style={{
+              background:
+                'linear-gradient(135deg, rgb(var(--color-accent-500)), rgb(var(--color-accent-600)))',
+              boxShadow: '0 4px 20px rgba(var(--color-accent-500), 0.25)',
+            }}
+          >
+            <SparklesIcon className="h-5 w-5" />
+            {activateTrialMutation.isPending
+              ? t('common.loading')
+              : t('subscription.trial.activateRegular', 'Обычный пробник · бесплатно')}
           </button>
         </div>
       )}
@@ -237,11 +280,16 @@ export default function Subscriptions() {
       {/* Subscription grid */}
       {subscriptions.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-          {subscriptions.map((sub) => (
+          {subscriptions.map((sub, index) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
+              // The tour's "open your subscription" step lives on this tab now:
+              // activating a trial lands the user here (see Dashboard), and the
+              // step points at the first card. Tapping it opens the detail, where
+              // the runner's landing detection picks the tour back up.
+              dataOnboarding={index === 0 ? 'dashboard-subscription' : undefined}
             />
           ))}
         </div>

@@ -34,6 +34,10 @@ export default function TrialOfferCard({
   const g = getGlassColors(isDark);
   const isFree = !trialInfo.requires_payment;
   const canAfford = balanceKopeks >= trialInfo.price_kopeks;
+  // Двойной оффер: обычный (наши ноды) + премиум (вендор). Тогда рисуем две
+  // параллельные кнопки-выбора одного формата, а общий блок цифр прячем — они
+  // относятся только к обычному пробнику и путают (у премиума 1 день/безлимит).
+  const twoTrials = isFree && trialInfo.unlimited && !!activateUnlimitedTrialMutation;
 
   return (
     <div
@@ -162,27 +166,29 @@ export default function TrialOfferCard({
         </div>
       )}
 
-      {/* Trial stats */}
-      <div className="mb-7 flex justify-center gap-8">
-        {[
-          { value: String(trialInfo.duration_days), label: t('subscription.trial.days') },
-          {
-            value: trialInfo.traffic_limit_gb === 0 ? '∞' : String(trialInfo.traffic_limit_gb),
-            label: t('common.units.gb'),
-          },
-          {
-            value: trialInfo.device_limit === 0 ? '∞' : String(trialInfo.device_limit),
-            label: t('subscription.trial.devices'),
-          },
-        ].map((stat, i) => (
-          <div key={i} className="text-center">
-            <div className="text-4xl font-extrabold leading-none tracking-tight text-dark-50">
-              {stat.value}
+      {/* Trial stats — прячем в режиме двух пробников (цифры только про обычный) */}
+      {!twoTrials && (
+        <div className="mb-7 flex justify-center gap-8">
+          {[
+            { value: String(trialInfo.duration_days), label: t('subscription.trial.days') },
+            {
+              value: trialInfo.traffic_limit_gb === 0 ? '∞' : String(trialInfo.traffic_limit_gb),
+              label: t('common.units.gb'),
+            },
+            {
+              value: trialInfo.device_limit === 0 ? '∞' : String(trialInfo.device_limit),
+              label: t('subscription.trial.devices'),
+            },
+          ].map((stat, i) => (
+            <div key={i} className="text-center">
+              <div className="text-4xl font-extrabold leading-none tracking-tight text-dark-50">
+                {stat.value}
+              </div>
+              <div className="mt-1 text-xs font-medium text-dark-50/30">{stat.label}</div>
             </div>
-            <div className="mt-1 text-xs font-medium text-dark-50/30">{stat.label}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Balance info for paid trial */}
       {!isFree && trialInfo.price_rubles > 0 && (
@@ -264,7 +270,18 @@ export default function TrialOfferCard({
                 }
           }
         >
-          {activateTrialMutation.isPending ? t('common.loading') : t('subscription.trial.activate')}
+          {activateTrialMutation.isPending ? (
+            t('common.loading')
+          ) : twoTrials ? (
+            <span className="flex flex-col items-center leading-tight">
+              <span>{t('subscription.trial.regularName', 'Обычный · бесплатно')}</span>
+              <span className="mt-1 text-xs font-medium opacity-70">
+                {t('subscription.trial.regularHint', 'Работает по Wi-Fi · 3 дня')}
+              </span>
+            </span>
+          ) : (
+            t('subscription.trial.activate')
+          )}
         </button>
       )}
 
@@ -283,9 +300,16 @@ export default function TrialOfferCard({
           }}
         >
           <BoltIcon className="h-5 w-5" />
-          {activateUnlimitedTrialMutation.isPending
-            ? t('common.loading')
-            : t('subscription.trial.activateUnlimited', 'Безлимит · 1 день')}
+          {activateUnlimitedTrialMutation.isPending ? (
+            t('common.loading')
+          ) : (
+            <span className="flex flex-col items-center leading-tight">
+              <span>{t('subscription.trial.premiumName', 'Премиум · бесплатно')}</span>
+              <span className="mt-1 text-xs font-medium opacity-80">
+                {t('subscription.trial.unlimitedHint', 'Работает всегда и везде · 1 день')}
+              </span>
+            </span>
+          )}
         </button>
       )}
     </div>
