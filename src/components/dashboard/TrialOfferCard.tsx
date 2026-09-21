@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { UseMutationResult } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 import type { TrialInfo } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTheme } from '../../hooks/useTheme';
@@ -12,6 +12,8 @@ interface TrialOfferCardProps {
   balanceKopeks: number;
   balanceRubles: number;
   activateTrialMutation: UseMutationResult<unknown, unknown, void, unknown>;
+  /** Активация безлимитного (вендорского) триала — показывается, если trialInfo.unlimited. */
+  activateUnlimitedTrialMutation?: UseMutationResult<unknown, unknown, void, unknown>;
   trialError: string | null;
   /** Onboarding tour target placed on the card's outer element. */
   dataOnboarding?: string;
@@ -22,6 +24,7 @@ export default function TrialOfferCard({
   balanceKopeks,
   balanceRubles,
   activateTrialMutation,
+  activateUnlimitedTrialMutation,
   trialError,
   dataOnboarding,
 }: TrialOfferCardProps) {
@@ -31,6 +34,10 @@ export default function TrialOfferCard({
   const g = getGlassColors(isDark);
   const isFree = !trialInfo.requires_payment;
   const canAfford = balanceKopeks >= trialInfo.price_kopeks;
+  // Двойной оффер: обычный (наши ноды) + премиум (вендор). Тогда рисуем две
+  // параллельные кнопки-выбора одного формата, а общий блок цифр прячем — они
+  // относятся только к обычному пробнику и путают (у премиума 1 день/безлимит).
+  const twoTrials = isFree && trialInfo.unlimited && !!activateUnlimitedTrialMutation;
 
   return (
     <div
@@ -159,27 +166,29 @@ export default function TrialOfferCard({
         </div>
       )}
 
-      {/* Trial stats */}
-      <div className="mb-7 flex justify-center gap-8">
-        {[
-          { value: String(trialInfo.duration_days), label: t('subscription.trial.days') },
-          {
-            value: trialInfo.traffic_limit_gb === 0 ? '∞' : String(trialInfo.traffic_limit_gb),
-            label: t('common.units.gb'),
-          },
-          {
-            value: trialInfo.device_limit === 0 ? '∞' : String(trialInfo.device_limit),
-            label: t('subscription.trial.devices'),
-          },
-        ].map((stat, i) => (
-          <div key={i} className="text-center">
-            <div className="text-4xl font-extrabold leading-none tracking-tight text-dark-50">
-              {stat.value}
+      {/* Trial stats — прячем в режиме двух пробников (цифры только про обычный) */}
+      {!twoTrials && (
+        <div className="mb-7 flex justify-center gap-8">
+          {[
+            { value: String(trialInfo.duration_days), label: t('subscription.trial.days') },
+            {
+              value: trialInfo.traffic_limit_gb === 0 ? '∞' : String(trialInfo.traffic_limit_gb),
+              label: t('common.units.gb'),
+            },
+            {
+              value: trialInfo.device_limit === 0 ? '∞' : String(trialInfo.device_limit),
+              label: t('subscription.trial.devices'),
+            },
+          ].map((stat, i) => (
+            <div key={i} className="text-center">
+              <div className="text-4xl font-extrabold leading-none tracking-tight text-dark-50">
+                {stat.value}
+              </div>
+              <div className="mt-1 text-xs font-medium text-dark-50/30">{stat.label}</div>
             </div>
-            <div className="mt-1 text-xs font-medium text-dark-50/30">{stat.label}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Balance info for paid trial */}
       {!isFree && trialInfo.price_rubles > 0 && (
@@ -261,7 +270,46 @@ export default function TrialOfferCard({
                 }
           }
         >
-          {activateTrialMutation.isPending ? t('common.loading') : t('subscription.trial.activate')}
+          {activateTrialMutation.isPending ? (
+            t('common.loading')
+          ) : twoTrials ? (
+            <span className="flex flex-col items-center leading-tight">
+              <span>{t('subscription.trial.regularName', 'Обычный · бесплатно')}</span>
+              <span className="mt-1 text-xs font-medium opacity-70">
+                {t('subscription.trial.regularHint', 'Работает по Wi-Fi · 3 дня')}
+              </span>
+            </span>
+          ) : (
+            t('subscription.trial.activate')
+          )}
+        </button>
+      )}
+
+      {/* Безлимитный триал (через вендора): показываем второй кнопкой, если доступен */}
+      {trialInfo.unlimited && activateUnlimitedTrialMutation && (
+        <button
+          onClick={() =>
+            !activateUnlimitedTrialMutation.isPending && activateUnlimitedTrialMutation.mutate()
+          }
+          disabled={activateUnlimitedTrialMutation.isPending}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] py-4 text-base font-bold tracking-tight transition-all duration-300 disabled:opacity-50"
+          style={{
+            background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+            color: '#fff',
+            boxShadow: '0 4px 20px rgba(124,58,237,0.25)',
+          }}
+        >
+          <BoltIcon className="h-5 w-5" />
+          {activateUnlimitedTrialMutation.isPending ? (
+            t('common.loading')
+          ) : (
+            <span className="flex flex-col items-center leading-tight">
+              <span>{t('subscription.trial.premiumName', 'Премиум · бесплатно')}</span>
+              <span className="mt-1 text-xs font-medium opacity-80">
+                {t('subscription.trial.unlimitedHint', 'Работает всегда и везде · 1 день')}
+              </span>
+            </span>
+          )}
         </button>
       )}
     </div>

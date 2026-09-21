@@ -81,6 +81,14 @@ interface OnboardingState {
    * for exactly the connected users it exists to reach.
    */
   forceNextStart: boolean;
+  /**
+   * The tour was stopped by the 10s escape hatch on a step that was WAITING on
+   * the user (activate a trial), not by an explicit "skip" or a real finish.
+   * Such a stop is not a real end: if the user then performs the action, the
+   * republished (different) step list re-opens the tour. Set by `complete()`
+   * for that case only; cleared by `start`/`skip`/`reset` and once consumed.
+   */
+  canResume: boolean;
 
   /**
    * Begins the tour unless it was already completed, the user is already
@@ -137,6 +145,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   hasStarted: false,
   hasEverConnected: false,
   forceNextStart: false,
+  canResume: false,
 
   start: (steps) => {
     if (get().hasStarted) return;
@@ -145,15 +154,33 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     if (!force && readFlag()) return;
     if (!force && get().hasEverConnected) return;
     if (!steps.length) return;
-    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true });
+    set({ steps, stepIndex: 0, isRunning: true, hasStarted: true, canResume: false });
   },
 
   setSteps: (steps) => {
-    if (!get().isRunning) return;
-    set((state) => ({
+    const state = get();
+    if (!state.isRunning) {
+      // Re-open a tour that the escape hatch stopped (canResume) once the
+      // user's action republishes a DIFFERENT step list — e.g. the trial step
+      // stops the tour, then activating the trial swaps in the subscription
+      // steps. A same-content republish (another query landing) must not
+      // resume, and a persisted/skipped tour never does.
+      const changed =
+        steps.map((s) => s.target).join('|') !== state.steps.map((s) => s.target).join('|');
+      if (state.canResume && !readFlag() && steps.length > 0 && changed) {
+        set({
+          steps,
+          stepIndex: Math.min(state.stepIndex, Math.max(0, steps.length - 1)),
+          isRunning: true,
+          canResume: false,
+        });
+      }
+      return;
+    }
+    set({
       steps,
       stepIndex: Math.min(state.stepIndex, Math.max(0, steps.length - 1)),
-    }));
+    });
   },
 
   setHasEverConnected: (hasEverConnected) => set({ hasEverConnected }),
@@ -171,18 +198,33 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     })),
 
   skip: () => {
-    set({ isRunning: false });
+    // Explicit opt-out ("Пройти в другой раз"/Escape): the user wants out, so
+    // it must NOT resume even if they later activate a trial.
+    set({ isRunning: false, canResume: false });
   },
 
   reset: () => {
     clearFlag();
-    set({ steps: [], stepIndex: 0, isRunning: false, hasStarted: false, forceNextStart: true });
+    set({
+      steps: [],
+      stepIndex: 0,
+      isRunning: false,
+      hasStarted: false,
+      forceNextStart: true,
+      canResume: false,
+    });
   },
 
   complete: () => {
     const { steps, stepIndex, hasEverConnected } = get();
-    if (shouldPersistCompletion(steps, stepIndex, hasEverConnected)) writeFlag();
-    set({ isRunning: false });
+    const persist = shouldPersistCompletion(steps, stepIndex, hasEverConnected);
+    if (persist) writeFlag();
+    // A non-persisted "complete" fired from a step that was waiting on the user
+    // (the 10s escape on "activate a trial") is not a real finish — arm resume
+    // so performing the action re-opens the tour. A real end (connect step,
+    // persisted) or any non-action step does not.
+    const canResume = !persist && Boolean(steps[stepIndex]?.awaitsUserAction);
+    set({ isRunning: false, canResume });
   },
 
   abort: () => set({ isRunning: false }),

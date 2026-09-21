@@ -40,6 +40,14 @@ export interface OnboardingStep {
    * link — because there pressing it must not be the only way forward.
    */
   awaitsUserAction?: boolean;
+  /**
+   * Drop the click-shield for this step: the spotlight still highlights the
+   * target, but nothing on the page is blocked. Used where the step lands the
+   * user on a screen whose OTHER controls are legitimate next actions too — e.g.
+   * "open your subscription" on /subscriptions, where the second free-trial
+   * button sits right beside the card and must stay tappable (#2 two-trials).
+   */
+  nonBlocking?: boolean;
 }
 
 interface OnboardingProps {
@@ -331,7 +339,10 @@ export default function Onboarding({
   //
   // Only click is intercepted, deliberately — touch scrolling still reaches the
   // page, so a user is never stuck on a screen they cannot move.
-  const blockerRects = isVisible ? computeBlockerRects(targetRect) : [];
+  // A nonBlocking step keeps its spotlight highlight but drops the click-shield,
+  // so every control on the page (e.g. the second free-trial button beside the
+  // subscription card) stays tappable — see OnboardingStep.nonBlocking (#2).
+  const blockerRects = isVisible && !step.nonBlocking ? computeBlockerRects(targetRect) : [];
 
   // Spotlight style
   const getSpotlightStyle = (): React.CSSProperties => {

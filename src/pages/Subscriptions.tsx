@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { ClipboardIcon, PlusIcon } from '@/components/icons';
+import { BoltIcon, ClipboardIcon, PlusIcon, SparklesIcon } from '@/components/icons';
 import { subscriptionApi } from '../api/subscription';
 import { balanceApi } from '../api/balance';
 import { useTheme } from '../hooks/useTheme';
@@ -69,12 +69,15 @@ export default function Subscriptions() {
     (s) => !s.is_trial && (s.status === 'active' || s.status === 'limited'),
   );
 
-  // Если у юзера нет подписок — проверяем доступность триала, иначе
-  // (в multi-tariff) ему вообще негде увидеть оффер.
+  // Тянем trial-info ВСЕГДА (не только при пустом кабинете): безлимитный
+  // (вендорский) триал — отдельный вид, и юзер, уже взявший лимитный триал,
+  // всё ещё вправе взять безлимитный. Без этого «оба триала» недостижимы из
+  // кабинета, потому что оффер-карточка ниже показывается только при
+  // полностью пустом кабинете.
   const { data: trialInfo, isLoading: trialLoading } = useQuery({
     queryKey: ['trial-info'],
     queryFn: () => subscriptionApi.getTrialInfo(),
-    enabled: hasNoSubscriptions,
+    enabled: !isLoading,
     staleTime: 30_000,
   });
 
@@ -96,8 +99,38 @@ export default function Subscriptions() {
       queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
       refreshUser();
     },
-    onError: (error: { response?: { data?: { detail?: string } } }) => {
-      setTrialError(error.response?.data?.detail || t('common.error'));
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
+    },
+  });
+
+  const activateUnlimitedTrialMutation = useMutation({
+    mutationFn: () => subscriptionApi.activateUnlimitedTrial(),
+    onSuccess: () => {
+      setTrialError(null);
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions-list'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-info'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-options'] });
+      refreshUser();
+    },
+    onError: () => {
+      // Trial activation failures (vendor 502, rollback, ...) come back as raw
+      // English backend detail; show a localized, friendly retry message.
+      setTrialError(
+        t(
+          'subscription.trial.activationError',
+          'Не удалось активировать пробник. Попробуйте ещё раз.',
+        ),
+      );
     },
   });
 
@@ -156,13 +189,14 @@ export default function Subscriptions() {
       )}
 
       {/* Empty state: показываем триал, если доступен; иначе — обычный empty */}
-      {hasNoSubscriptions && !trialLoading && trialInfo?.is_available && (
+      {hasNoSubscriptions && !trialLoading && (trialInfo?.is_available || trialInfo?.unlimited) && (
         <div className="space-y-4">
           <TrialOfferCard
             trialInfo={trialInfo}
             balanceKopeks={balanceData?.balance_kopeks ?? 0}
             balanceRubles={balanceData?.balance_rubles ?? 0}
             activateTrialMutation={activateTrialMutation}
+            activateUnlimitedTrialMutation={activateUnlimitedTrialMutation}
             trialError={trialError}
           />
           {/* Новый пользователь не обязан активировать триал, чтобы попасть
@@ -182,14 +216,80 @@ export default function Subscriptions() {
         <EmptyState onBuy={() => navigate('/subscription/purchase')} />
       )}
 
+      {/* Безлимитный (вендорский) триал остаётся доступен, даже если у юзера уже
+          есть подписки (например, он взял лимитный триал): без этого «оба триала»
+          недостижимы из кабинета — оффер-карточка выше показывается только при
+          полностью пустом кабинете. Отдельная кнопка появляется, пока безлимитный
+          триал не использован (trialInfo.unlimited). */}
+      {!isLoading && subscriptions.length > 0 && trialInfo?.unlimited && (
+        <div className="space-y-2">
+          {trialError && (
+            <div className="rounded-xl border border-error-500/30 bg-error-500/10 p-3 text-center text-sm text-error-400">
+              {trialError}
+            </div>
+          )}
+          <button
+            onClick={() =>
+              !activateUnlimitedTrialMutation.isPending && activateUnlimitedTrialMutation.mutate()
+            }
+            disabled={activateUnlimitedTrialMutation.isPending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold tracking-tight transition-all duration-300 disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+              color: '#fff',
+              boxShadow: '0 4px 20px rgba(124,58,237,0.25)',
+            }}
+          >
+            <BoltIcon className="h-5 w-5" />
+            {activateUnlimitedTrialMutation.isPending
+              ? t('common.loading')
+              : t('subscription.trial.activateUnlimited', 'Премиум подписка на 1 день')}
+          </button>
+        </div>
+      )}
+
+      {/* Обычный (лимитный) пробник остаётся доступен, если юзер взял только
+          премиум: симметрично премиум-кнопке выше. Бэкенд теперь пускает лимитный
+          триал при активном ПРОБНИКЕ (блокирует лишь платная подписка) — так «оба
+          в любом порядке». Оффер-карточка показывается лишь при пустом кабинете. */}
+      {!isLoading && subscriptions.length > 0 && trialInfo?.is_available && (
+        <div className="space-y-2">
+          {trialError && (
+            <div className="rounded-xl border border-error-500/30 bg-error-500/10 p-3 text-center text-sm text-error-400">
+              {trialError}
+            </div>
+          )}
+          <button
+            onClick={() => !activateTrialMutation.isPending && activateTrialMutation.mutate()}
+            disabled={activateTrialMutation.isPending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold tracking-tight text-white transition-all duration-300 disabled:opacity-50"
+            style={{
+              background:
+                'linear-gradient(135deg, rgb(var(--color-accent-500)), rgb(var(--color-accent-600)))',
+              boxShadow: '0 4px 20px rgba(var(--color-accent-500), 0.25)',
+            }}
+          >
+            <SparklesIcon className="h-5 w-5" />
+            {activateTrialMutation.isPending
+              ? t('common.loading')
+              : t('subscription.trial.activateRegular', 'Обычный пробник · бесплатно')}
+          </button>
+        </div>
+      )}
+
       {/* Subscription grid */}
       {subscriptions.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-          {subscriptions.map((sub) => (
+          {subscriptions.map((sub, index) => (
             <SubscriptionListCard
               key={sub.id}
               subscription={sub}
               onClick={() => navigate(`/subscriptions/${sub.id}`)}
+              // The tour's "open your subscription" step lives on this tab now:
+              // activating a trial lands the user here (see Dashboard), and the
+              // step points at the first card. Tapping it opens the detail, where
+              // the runner's landing detection picks the tour back up.
+              dataOnboarding={index === 0 ? 'dashboard-subscription' : undefined}
             />
           ))}
         </div>

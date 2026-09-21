@@ -466,6 +466,11 @@ export const subscriptionApi = {
     return response.data;
   },
 
+  activateUnlimitedTrial: async (): Promise<Subscription> => {
+    const response = await apiClient.post<Subscription>('/cabinet/subscription/trial/unlimited');
+    return response.data;
+  },
+
   // ── Purchase ────────────────────────────────────────────────────────
 
   getPurchaseOptions: async (subscriptionId?: number): Promise<PurchaseOptions> => {
