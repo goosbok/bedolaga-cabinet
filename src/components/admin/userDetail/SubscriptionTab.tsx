@@ -661,8 +661,35 @@ export function SubscriptionTab(props: SubscriptionTabProps) {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent-500 border-t-transparent" />
             </div>
           ) : panelInfo && !panelInfo.found ? (
-            <div className="rounded-xl border border-dark-700 bg-dark-800/50 p-4 text-center text-sm text-dark-400">
-              {t('admin.users.detail.panelNotFound')}
+            <div className="rounded-xl bg-dark-800/50 p-4">
+              {selectedSub?.subscription_url && (
+                <>
+                  <div className="mb-3 text-sm font-medium text-dark-200">
+                    {t('admin.users.detail.subscriptionUrl')}
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(selectedSub.subscription_url!)}
+                    className="w-full rounded-lg bg-dark-700/50 p-2 text-left transition-colors hover:bg-dark-700"
+                  >
+                    <div className="mb-0.5 text-xs text-dark-500">
+                      {t('admin.users.detail.subscriptionUrl')}
+                      {selectedSub.external_provider ? ` · ${selectedSub.external_provider}` : ''}
+                    </div>
+                    <div className="truncate font-mono text-xs text-dark-200">
+                      {selectedSub.subscription_url}
+                    </div>
+                  </button>
+                </>
+              )}
+              <div
+                className={
+                  selectedSub?.subscription_url
+                    ? 'mt-3 text-xs text-dark-500'
+                    : 'text-center text-sm text-dark-400'
+                }
+              >
+                {t('admin.users.detail.panelNotFound')}
+              </div>
             </div>
           ) : panelInfo && panelInfo.found ? (
             <>

@@ -27,6 +27,8 @@ export interface UserSubscriptionInfo {
   days_remaining: number;
   purchased_traffic_gb: number;
   traffic_purchases: TrafficPurchaseInfo[];
+  subscription_url: string | null;
+  external_provider: string | null;
 }
 
 export interface UserPromoGroupInfo {
